@@ -1,0 +1,401 @@
+[
+  {
+    "id": "table.authSession",
+    "label": "Create table \"authSession\"",
+    "summary": "Creates table \"authSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "authSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"authSession\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"authSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"authSession\"",
+        "sql": "CREATE TABLE \"public\".\"authSession\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"expiresAt\" timestamptz NOT NULL,\n  \"id\" text NOT NULL,\n  \"revokedAt\" timestamptz,\n  \"tokenHash\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"authSession\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"authSession\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.loginEvent",
+    "label": "Create table \"loginEvent\"",
+    "summary": "Creates table \"loginEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "loginEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"loginEvent\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"loginEvent\"",
+        "sql": "CREATE TABLE \"public\".\"loginEvent\" (\n  \"eventType\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"occurredAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"source\" text NOT NULL,\n  \"userId\" text,\n  \"username\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"loginEvent\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.authSession.authSession_tokenHash_key",
+    "label": "Add unique constraint on \"authSession\" (tokenHash)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "authSession_tokenHash_key",
+        "table": "authSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"authSession_tokenHash_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "authSession_tokenHash_key",
+          "public",
+          "\"public\".\"authSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"authSession_tokenHash_key\"",
+        "sql": "ALTER TABLE \"public\".\"authSession\" ADD CONSTRAINT \"authSession_tokenHash_key\" UNIQUE (\"tokenHash\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"authSession_tokenHash_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "authSession_tokenHash_key",
+          "public",
+          "\"public\".\"authSession\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.authSession.authSession_userId_expiresAt_idx_9721b56d",
+    "label": "Create index \"authSession_userId_expiresAt_idx_9721b56d\" on \"authSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "authSession_userId_expiresAt_idx_9721b56d",
+        "table": "authSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"authSession_userId_expiresAt_idx_9721b56d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"authSession_userId_expiresAt_idx_9721b56d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"authSession_userId_expiresAt_idx_9721b56d\"",
+        "sql": "CREATE INDEX \"authSession_userId_expiresAt_idx_9721b56d\" ON \"public\".\"authSession\" (\"userId\", \"expiresAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"authSession_userId_expiresAt_idx_9721b56d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"authSession_userId_expiresAt_idx_9721b56d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.authSession.authSession_userId_idx_a489d58a",
+    "label": "Create index \"authSession_userId_idx_a489d58a\" on \"authSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "authSession_userId_idx_a489d58a",
+        "table": "authSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"authSession_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"authSession_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"authSession_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"authSession_userId_idx_a489d58a\" ON \"public\".\"authSession\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"authSession_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"authSession_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.loginEvent.loginEvent_userId_idx_a489d58a",
+    "label": "Create index \"loginEvent_userId_idx_a489d58a\" on \"loginEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "loginEvent_userId_idx_a489d58a",
+        "table": "loginEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"loginEvent_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"loginEvent_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"loginEvent_userId_idx_a489d58a\" ON \"public\".\"loginEvent\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"loginEvent_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.loginEvent.loginEvent_userId_occurredAt_idx_9003f3bb",
+    "label": "Create index \"loginEvent_userId_occurredAt_idx_9003f3bb\" on \"loginEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "loginEvent_userId_occurredAt_idx_9003f3bb",
+        "table": "loginEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"loginEvent_userId_occurredAt_idx_9003f3bb\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent_userId_occurredAt_idx_9003f3bb\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"loginEvent_userId_occurredAt_idx_9003f3bb\"",
+        "sql": "CREATE INDEX \"loginEvent_userId_occurredAt_idx_9003f3bb\" ON \"public\".\"loginEvent\" (\"userId\", \"occurredAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"loginEvent_userId_occurredAt_idx_9003f3bb\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent_userId_occurredAt_idx_9003f3bb\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.loginEvent.loginEvent_username_eventType_occurredAt_idx_f3231c61",
+    "label": "Create index \"loginEvent_username_eventType_occurredAt_idx_f3231c61\" on \"loginEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "loginEvent_username_eventType_occurredAt_idx_f3231c61",
+        "table": "loginEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"loginEvent_username_eventType_occurredAt_idx_f3231c61\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent_username_eventType_occurredAt_idx_f3231c61\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"loginEvent_username_eventType_occurredAt_idx_f3231c61\"",
+        "sql": "CREATE INDEX \"loginEvent_username_eventType_occurredAt_idx_f3231c61\" ON \"public\".\"loginEvent\" (\"username\", \"eventType\", \"occurredAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"loginEvent_username_eventType_occurredAt_idx_f3231c61\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"loginEvent_username_eventType_occurredAt_idx_f3231c61\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.authSession.authSession_userId_fkey",
+    "label": "Add foreign key \"authSession_userId_fkey\" on \"authSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "authSession_userId_fkey",
+        "table": "authSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"authSession_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "authSession_userId_fkey",
+          "public",
+          "\"public\".\"authSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"authSession_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"authSession\"\nADD CONSTRAINT \"authSession_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"authSession_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "authSession_userId_fkey",
+          "public",
+          "\"public\".\"authSession\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.loginEvent.loginEvent_userId_fkey",
+    "label": "Add foreign key \"loginEvent_userId_fkey\" on \"loginEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "loginEvent_userId_fkey",
+        "table": "loginEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"loginEvent_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "loginEvent_userId_fkey",
+          "public",
+          "\"public\".\"loginEvent\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"loginEvent_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"loginEvent\"\nADD CONSTRAINT \"loginEvent_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"loginEvent_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "loginEvent_userId_fkey",
+          "public",
+          "\"public\".\"loginEvent\""
+        ]
+      }
+    ]
+  }
+]

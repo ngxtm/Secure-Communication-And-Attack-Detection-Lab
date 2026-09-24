@@ -1,0 +1,36 @@
+// use prisma-8
+
+model User {
+  id           String   @id @default(cuid(2))
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  role         String   @default("user")
+  createdAt    TimestamptzString @default(now())
+  updatedAt    temporal.updatedAtString()
+}
+
+model AuthSession {
+  id        String   @id @default(cuid(2))
+  tokenHash String   @unique
+  userId    String
+  createdAt TimestamptzString @default(now())
+  expiresAt TimestamptzString
+  revokedAt TimestamptzString?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model LoginEvent {
+  id        String   @id @default(cuid(2))
+  username  String
+  userId    String?
+  eventType String
+  source    String
+  occurredAt TimestamptzString @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([username, eventType, occurredAt])
+  @@index([userId, occurredAt])
+}
