@@ -41,7 +41,7 @@ export default function LoginPage() {
           if (!cancelled) setUser(data.user);
         }
       } catch {
-        if (!cancelled) setMessage("Không thể kết nối API. Hãy kiểm tra trạng thái lab.");
+        if (!cancelled) setMessage("Could not connect to the API. Check the lab status.");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -67,24 +67,24 @@ export default function LoginPage() {
       });
 
       if (response.status === 401) {
-        setMessage("Tên đăng nhập hoặc mật khẩu không đúng.");
+        setMessage("The username or password is incorrect.");
         return;
       }
       if (response.status === 429) {
-        setMessage("Quá nhiều lần thử. Chờ khoảng một phút rồi thử lại.");
+        setMessage("Too many attempts. Wait about one minute and try again.");
         return;
       }
       if (!response.ok) {
-        setMessage("Đăng nhập thất bại. Hãy kiểm tra API và cấu hình lab.");
+        setMessage("Login failed. Check the API and lab configuration.");
         return;
       }
 
       const data = (await response.json()) as UserResponse;
       setUser(data.user);
       setPassword("");
-      setMessage("Đăng nhập thành công. Session được lưu trong cookie HttpOnly.");
+      setMessage("Login successful. The session is stored in an HttpOnly cookie.");
     } catch {
-      setMessage("Không thể kết nối API. Hãy kiểm tra trạng thái lab.");
+      setMessage("Could not connect to the API. Check the lab status.");
     } finally {
       setIsSubmitting(false);
     }
@@ -99,13 +99,13 @@ export default function LoginPage() {
         credentials: "same-origin",
       });
       if (!response.ok) {
-        setMessage("Không thể kết thúc session. Hãy thử lại.");
+        setMessage("Could not end the session. Please try again.");
         return;
       }
       setUser(null);
-      setMessage("Session đã được thu hồi.");
+      setMessage("The session has been revoked.");
     } catch {
-      setMessage("Không thể kết nối API. Hãy kiểm tra trạng thái lab.");
+      setMessage("Could not connect to the API. Check the lab status.");
     }
   }
 
@@ -125,7 +125,7 @@ export default function LoginPage() {
             </span>
           </Link>
           <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300">
-            Giai đoạn 1 · Authentication
+            Phase 1 · Authentication
           </span>
         </header>
 
@@ -135,15 +135,15 @@ export default function LoginPage() {
               Identity · Sessions · Audit trail
             </p>
             <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              Xác thực là lớp đầu tiên của lab.
+              Authentication is the first layer of the lab.
             </h1>
             <p className="mt-5 text-base leading-7 text-slate-300">
-              Đăng nhập bằng tài khoản Alice hoặc Bob để xem cách Argon2id,
-              session server-side và login event phối hợp với nhau.
+              Sign in as Alice or Bob to see how Argon2id, server-side sessions,
+              and login events work together.
             </p>
             <dl className="mt-8 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-                <dt className="text-xs text-slate-400">Mật khẩu</dt>
+                <dt className="text-xs text-slate-400">Password</dt>
                 <dd className="mt-2 text-sm font-medium text-emerald-100">Argon2id</dd>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
@@ -151,7 +151,7 @@ export default function LoginPage() {
                 <dd className="mt-2 text-sm font-medium text-emerald-100">HttpOnly cookie</dd>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-                <dt className="text-xs text-slate-400">Theo dõi</dt>
+                <dt className="text-xs text-slate-400">Monitoring</dt>
                 <dd className="mt-2 text-sm font-medium text-emerald-100">Login events</dd>
               </div>
             </dl>
@@ -164,12 +164,12 @@ export default function LoginPage() {
             <div className="mb-7">
               <p className="font-mono text-xs text-emerald-200">AUTH / 01</p>
               <h2 id="login-heading" className="mt-2 text-2xl font-semibold">
-                {user ? "Bạn đã đăng nhập" : "Đăng nhập lab"}
+                {user ? "You are signed in" : "Lab sign in"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
                 {user
-                  ? "Session đã được xác thực qua API."
-                  : "Mật khẩu demo được đọc từ file .env ở thư mục gốc."}
+                  ? "The session has been authenticated by the API."
+                  : "Demo passwords are read from the root .env file."}
               </p>
             </div>
 
@@ -178,23 +178,29 @@ export default function LoginPage() {
                 aria-live="polite"
                 className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300"
               >
-                Đang kiểm tra session…
+                Checking session…
               </div>
             ) : user ? (
               <div className="space-y-5">
                 <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.07] p-4">
-                  <p className="text-xs text-slate-400">Tài khoản hiện tại</p>
+                  <p className="text-xs text-slate-400">Current account</p>
                   <p className="mt-1 text-lg font-semibold">{user.displayName}</p>
                   <p className="mt-1 font-mono text-sm text-emerald-100">
                     @{user.username}
                   </p>
                 </div>
+                <Link
+                  href="/messages"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-emerald-200 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
+                >
+                  Open Secure Messaging
+                </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
                   className="min-h-11 w-full rounded-xl border border-white/15 px-4 text-sm font-semibold transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
                 >
-                  Đăng xuất và thu hồi session
+                  Sign out and revoke session
                 </button>
               </div>
             ) : (
@@ -204,7 +210,7 @@ export default function LoginPage() {
                     htmlFor="username"
                     className="mb-2 block text-sm font-medium text-slate-200"
                   >
-                    Tên đăng nhập
+                    Username
                   </label>
                   <input
                     id="username"
@@ -236,7 +242,7 @@ export default function LoginPage() {
                     htmlFor="password"
                     className="mb-2 block text-sm font-medium text-slate-200"
                   >
-                    Mật khẩu
+                    Password
                   </label>
                   <input
                     id="password"
@@ -256,7 +262,7 @@ export default function LoginPage() {
                   disabled={isSubmitting}
                   className="min-h-12 w-full rounded-xl bg-emerald-200 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
                 >
-                  {isSubmitting ? "Đang xác thực…" : "Đăng nhập"}
+                  {isSubmitting ? "Signing in…" : "Sign in"}
                 </button>
               </form>
             )}
@@ -265,8 +271,8 @@ export default function LoginPage() {
               {message}
             </p>
             <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-5 text-slate-500">
-              Không lưu mật khẩu hoặc token trong trình duyệt. Cookie session
-              được đánh dấu HttpOnly và được thu hồi khi đăng xuất.
+              Passwords and tokens are not stored in the browser. The session cookie
+              is marked HttpOnly and is revoked when you sign out.
             </p>
           </section>
         </section>
@@ -274,7 +280,7 @@ export default function LoginPage() {
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5 text-xs text-slate-500">
           <span>Educational lab · Controlled scenarios</span>
           <Link href="/" className="text-slate-300 underline decoration-white/20 underline-offset-4 hover:text-white">
-            Về trang chủ
+            Back to home
           </Link>
         </footer>
       </div>

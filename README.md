@@ -1,6 +1,6 @@
 # Secure Communication & Attack Detection Lab
 
-Course project for demonstrating network security concepts. The stack is generated with the official Next.js and NestJS CLIs and runs as one Docker Compose application.
+Course project for demonstrating network security concepts. The stack is generated with the official Next.js and NestJS CLIs and runs as one Docker Compose application. English is the default language for the application interface and project documentation.
 
 ## Requirements
 
@@ -48,13 +48,31 @@ Auth endpoints:
 - `GET /api/auth/session` — return the current public user.
 - `POST /api/auth/logout` — revoke the server-side session and clear the cookie.
 
+## Secure messaging demo
+
+Open `http://localhost:3000/messages` after logging in. Each account creates an RSA-OAEP identity the first time the page loads. The private CryptoKey is non-extractable and stays in this browser's IndexedDB; the API receives only the public key and its SHA-256 fingerprint.
+
+For the demo, log in as Alice and open Messages, then log out, log in as Bob, and open Messages once to create Bob's identity. Return to Alice, compare Bob's displayed fingerprint with the fingerprint shown while logged in as Bob through a separate channel, and confirm it in the UI before sending. Repeat the comparison from Bob's account for Alice.
+
+Each message gets a fresh AES-256-GCM key and 96-bit IV. The client wraps that AES key separately for Alice and Bob with RSA-OAEP/SHA-256, so both participants can read the conversation. The API stores ciphertext, the IV, both wrapped keys, sender/recipient IDs, and time; it does not receive the message plaintext or either private key.
+
+Private keys are tied to this browser profile. Clearing browser storage or moving to another device can make old messages unreadable. The explicit key recovery action updates the registered public identity, reusing a locally stored key when one is available or creating a new one otherwise; messages remain readable only if their original private keys still exist locally. The fingerprint step helps detect a substituted public key; accepting the first fingerprint without comparing it independently does not verify the other person's identity.
+
+Message endpoints:
+
+- `GET /api/messages/identity` — get the signed-in account's public identity.
+- `GET /api/messages/identity/{username}` — get another account's public identity.
+- `PUT /api/messages/identity` — publish an identity; replacement requires an explicit rotation flag.
+- `POST /api/messages` — store an encrypted message envelope.
+- `GET /api/messages/conversation/{username}` — retrieve up to 100 recent ciphertext envelopes.
+
 ## Prisma ORM 8
 
 The project uses Prisma ORM 8's PostgreSQL contract and runtime. After editing `apps/api/src/prisma/contract.prisma`, emit types and plan a reviewed migration:
 
 ```sh
-pnpm --filter api exec prisma contract emit
-pnpm --filter api exec prisma migration plan --name describe_change
+pnpm --filter api run contract:emit
+pnpm --dir apps/api exec prisma migration plan --name describe_change
 ```
 
 Review the generated migration under `apps/api/migrations`. The API container applies checked-in migrations at startup. PostgreSQL data is kept in the `postgres_data` volume.
@@ -65,7 +83,7 @@ Prisma ORM 8 is currently a release candidate. Package versions are locked in `p
 
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Compose creates the local PostgreSQL database/container from these values.
 - `SEED_ALICE_PASSWORD`, `SEED_BOB_PASSWORD`: required demo credentials (20-128 bytes); do not commit real values.
-- `WEB_ORIGINS`: comma-separated allowed browser origins for login/logout. The local defaults cover the web app and Swagger UI.
+- `WEB_ORIGINS`: comma-separated allowed browser origins for login/logout and secure-message writes. The local defaults cover the web app and Swagger UI.
 - `API_INTERNAL_URL`: API URL reachable from the Next.js server. Keep `http://api:3000` under Compose.
 - `SESSION_COOKIE_SECURE`: enable for HTTPS deployments.
 - `WEB_PORT`, `API_PORT`: local host ports.

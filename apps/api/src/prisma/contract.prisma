@@ -34,3 +34,28 @@ model LoginEvent {
   @@index([username, eventType, occurredAt])
   @@index([userId, occurredAt])
 }
+
+model CryptoIdentity {
+  userId      String   @id
+  publicKey   String
+  fingerprint String   @unique
+  createdAt   TimestamptzString @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SecureMessage {
+  id          String   @id @default(cuid(2))
+  senderId    String
+  recipientId String
+  version     Int      @default(1)
+  ciphertext  String
+  iv          String
+  senderWrappedKey    String
+  recipientWrappedKey String
+  createdAt           TimestamptzString @default(now())
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User     @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
+}

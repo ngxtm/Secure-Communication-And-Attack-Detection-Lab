@@ -44,17 +44,17 @@ export default function Home() {
               <span className="block text-emerald-200">visible and testable.</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              Lab học tập để quan sát cách bảo vệ tin nhắn và file, sau đó chạy
-              các tình huống tấn công có giới hạn và xem hệ thống phản ứng.
+              An educational lab for observing how messages and files are protected, then running
+              bounded attack scenarios and watching how the system responds.
             </p>
             <p className="mt-8 text-sm text-slate-400">
-              Bản khởi tạo gồm frontend, API, PostgreSQL và Prisma ORM.
+              The foundation includes the frontend, API, PostgreSQL, and Prisma ORM.
             </p>
             <a
               href="/login"
               className="mt-7 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-200 px-5 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-200"
             >
-              Mở lab đăng nhập
+              Open the login lab
             </a>
           </div>
 

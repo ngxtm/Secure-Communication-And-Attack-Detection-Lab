@@ -1,0 +1,404 @@
+[
+  {
+    "id": "table.cryptoIdentity",
+    "label": "Create table \"cryptoIdentity\"",
+    "summary": "Creates table \"cryptoIdentity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "cryptoIdentity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"cryptoIdentity\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"cryptoIdentity\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"cryptoIdentity\"",
+        "sql": "CREATE TABLE \"public\".\"cryptoIdentity\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"fingerprint\" text NOT NULL,\n  \"publicKey\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"cryptoIdentity\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"cryptoIdentity\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.secureMessage",
+    "label": "Create table \"secureMessage\"",
+    "summary": "Creates table \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"secureMessage\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"secureMessage\"",
+        "sql": "CREATE TABLE \"public\".\"secureMessage\" (\n  \"ciphertext\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"iv\" text NOT NULL,\n  \"recipientId\" text NOT NULL,\n  \"recipientWrappedKey\" text NOT NULL,\n  \"senderId\" text NOT NULL,\n  \"senderWrappedKey\" text NOT NULL,\n  \"version\" int4 DEFAULT 1 NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"secureMessage\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.cryptoIdentity.cryptoIdentity_fingerprint_key",
+    "label": "Add unique constraint on \"cryptoIdentity\" (fingerprint)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "cryptoIdentity_fingerprint_key",
+        "table": "cryptoIdentity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"cryptoIdentity_fingerprint_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "cryptoIdentity_fingerprint_key",
+          "public",
+          "\"public\".\"cryptoIdentity\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"cryptoIdentity_fingerprint_key\"",
+        "sql": "ALTER TABLE \"public\".\"cryptoIdentity\" ADD CONSTRAINT \"cryptoIdentity_fingerprint_key\" UNIQUE (\"fingerprint\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"cryptoIdentity_fingerprint_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "cryptoIdentity_fingerprint_key",
+          "public",
+          "\"public\".\"cryptoIdentity\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureMessage.secureMessage_recipientId_idx_c9527cf8",
+    "label": "Create index \"secureMessage_recipientId_idx_c9527cf8\" on \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureMessage_recipientId_idx_c9527cf8",
+        "table": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureMessage_recipientId_idx_c9527cf8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_recipientId_idx_c9527cf8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureMessage_recipientId_idx_c9527cf8\"",
+        "sql": "CREATE INDEX \"secureMessage_recipientId_idx_c9527cf8\" ON \"public\".\"secureMessage\" (\"recipientId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureMessage_recipientId_idx_c9527cf8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_recipientId_idx_c9527cf8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureMessage.secureMessage_recipientId_senderId_createdAt_idx_fd885bcc",
+    "label": "Create index \"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\" on \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureMessage_recipientId_senderId_createdAt_idx_fd885bcc",
+        "table": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\"",
+        "sql": "CREATE INDEX \"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\" ON \"public\".\"secureMessage\" (\"recipientId\", \"senderId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_recipientId_senderId_createdAt_idx_fd885bcc\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureMessage.secureMessage_senderId_idx_4689c490",
+    "label": "Create index \"secureMessage_senderId_idx_4689c490\" on \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureMessage_senderId_idx_4689c490",
+        "table": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureMessage_senderId_idx_4689c490\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_senderId_idx_4689c490\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureMessage_senderId_idx_4689c490\"",
+        "sql": "CREATE INDEX \"secureMessage_senderId_idx_4689c490\" ON \"public\".\"secureMessage\" (\"senderId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureMessage_senderId_idx_4689c490\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_senderId_idx_4689c490\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureMessage.secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2",
+    "label": "Create index \"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\" on \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2",
+        "table": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\"",
+        "sql": "CREATE INDEX \"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\" ON \"public\".\"secureMessage\" (\"senderId\", \"recipientId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureMessage_senderId_recipientId_createdAt_idx_6cf1f7d2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.cryptoIdentity.cryptoIdentity_userId_fkey",
+    "label": "Add foreign key \"cryptoIdentity_userId_fkey\" on \"cryptoIdentity\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "cryptoIdentity_userId_fkey",
+        "table": "cryptoIdentity"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"cryptoIdentity_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "cryptoIdentity_userId_fkey",
+          "public",
+          "\"public\".\"cryptoIdentity\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"cryptoIdentity_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"cryptoIdentity\"\nADD CONSTRAINT \"cryptoIdentity_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"cryptoIdentity_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "cryptoIdentity_userId_fkey",
+          "public",
+          "\"public\".\"cryptoIdentity\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.secureMessage.secureMessage_senderId_fkey",
+    "label": "Add foreign key \"secureMessage_senderId_fkey\" on \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "secureMessage_senderId_fkey",
+        "table": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"secureMessage_senderId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureMessage_senderId_fkey",
+          "public",
+          "\"public\".\"secureMessage\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"secureMessage_senderId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"secureMessage\"\nADD CONSTRAINT \"secureMessage_senderId_fkey\"\nFOREIGN KEY (\"senderId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"secureMessage_senderId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureMessage_senderId_fkey",
+          "public",
+          "\"public\".\"secureMessage\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.secureMessage.secureMessage_recipientId_fkey",
+    "label": "Add foreign key \"secureMessage_recipientId_fkey\" on \"secureMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "secureMessage_recipientId_fkey",
+        "table": "secureMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"secureMessage_recipientId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureMessage_recipientId_fkey",
+          "public",
+          "\"public\".\"secureMessage\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"secureMessage_recipientId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"secureMessage\"\nADD CONSTRAINT \"secureMessage_recipientId_fkey\"\nFOREIGN KEY (\"recipientId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"secureMessage_recipientId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureMessage_recipientId_fkey",
+          "public",
+          "\"public\".\"secureMessage\""
+        ]
+      }
+    ]
+  }
+]

@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Post,
   Req,
@@ -19,6 +18,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import { assertBrowserRequest } from './browser-request.js';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './login.dto.js';
 import { SESSION_COOKIE_NAME, SessionGuard } from './session.guard.js';
@@ -63,7 +63,7 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    this.assertBrowserRequest(request);
+    assertBrowserRequest(request);
     response.setHeader('Cache-Control', 'no-store');
 
     const result = await this.authService.login(
@@ -112,7 +112,7 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    this.assertBrowserRequest(request);
+    assertBrowserRequest(request);
     response.setHeader('Cache-Control', 'no-store');
 
     await this.authService.logout(
@@ -121,26 +121,6 @@ export class AuthController {
     );
     response.clearCookie(SESSION_COOKIE_NAME, this.cookieOptions(false));
     return { success: true };
-  }
-
-  private assertBrowserRequest(request: Request): void {
-    const origin = request.get('origin');
-    const csrfHeader = request.get('x-csrf-protection');
-    const allowedOrigins = (
-      process.env.WEB_ORIGINS ??
-      'http://localhost:3000,http://127.0.0.1:3000,http://localhost:4000,http://127.0.0.1:4000'
-    )
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    if (
-      !origin ||
-      !allowedOrigins.includes(origin) ||
-      csrfHeader !== '1'
-    ) {
-      throw new ForbiddenException('Request origin or CSRF check failed');
-    }
   }
 
   private cookieOptions(includeMaxAge = true) {
