@@ -1,0 +1,281 @@
+[
+  {
+    "id": "table.secureFile",
+    "label": "Create table \"secureFile\"",
+    "summary": "Creates table \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"secureFile\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"secureFile\"",
+        "sql": "CREATE TABLE \"public\".\"secureFile\" (\n  \"ciphertext\" bytea NOT NULL,\n  \"ciphertextBytes\" int4 NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"iv\" text NOT NULL,\n  \"recipientId\" text NOT NULL,\n  \"recipientWrappedKey\" text NOT NULL,\n  \"senderId\" text NOT NULL,\n  \"senderWrappedKey\" text NOT NULL,\n  \"version\" int4 DEFAULT 1 NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"secureFile\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureFile.secureFile_recipientId_idx_c9527cf8",
+    "label": "Create index \"secureFile_recipientId_idx_c9527cf8\" on \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureFile_recipientId_idx_c9527cf8",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureFile_recipientId_idx_c9527cf8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_recipientId_idx_c9527cf8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureFile_recipientId_idx_c9527cf8\"",
+        "sql": "CREATE INDEX \"secureFile_recipientId_idx_c9527cf8\" ON \"public\".\"secureFile\" (\"recipientId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureFile_recipientId_idx_c9527cf8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_recipientId_idx_c9527cf8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureFile.secureFile_recipientId_senderId_createdAt_idx_fd885bcc",
+    "label": "Create index \"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\" on \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureFile_recipientId_senderId_createdAt_idx_fd885bcc",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\"",
+        "sql": "CREATE INDEX \"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\" ON \"public\".\"secureFile\" (\"recipientId\", \"senderId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_recipientId_senderId_createdAt_idx_fd885bcc\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureFile.secureFile_senderId_idx_4689c490",
+    "label": "Create index \"secureFile_senderId_idx_4689c490\" on \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureFile_senderId_idx_4689c490",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureFile_senderId_idx_4689c490\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_senderId_idx_4689c490\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureFile_senderId_idx_4689c490\"",
+        "sql": "CREATE INDEX \"secureFile_senderId_idx_4689c490\" ON \"public\".\"secureFile\" (\"senderId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureFile_senderId_idx_4689c490\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_senderId_idx_4689c490\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.secureFile.secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2",
+    "label": "Create index \"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\" on \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\"",
+        "sql": "CREATE INDEX \"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\" ON \"public\".\"secureFile\" (\"senderId\", \"recipientId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.secureFile.secureFile_senderId_fkey",
+    "label": "Add foreign key \"secureFile_senderId_fkey\" on \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "secureFile_senderId_fkey",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"secureFile_senderId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureFile_senderId_fkey",
+          "public",
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"secureFile_senderId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"secureFile\"\nADD CONSTRAINT \"secureFile_senderId_fkey\"\nFOREIGN KEY (\"senderId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"secureFile_senderId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureFile_senderId_fkey",
+          "public",
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.secureFile.secureFile_recipientId_fkey",
+    "label": "Add foreign key \"secureFile_recipientId_fkey\" on \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "secureFile_recipientId_fkey",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"secureFile_recipientId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureFile_recipientId_fkey",
+          "public",
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"secureFile_recipientId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"secureFile\"\nADD CONSTRAINT \"secureFile_recipientId_fkey\"\nFOREIGN KEY (\"recipientId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"secureFile_recipientId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureFile_recipientId_fkey",
+          "public",
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ]
+  }
+]

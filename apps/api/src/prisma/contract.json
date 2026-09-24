@@ -16,6 +16,10 @@
       "model": "LoginEvent",
       "namespace": "public"
     },
+    "secureFile": {
+      "model": "SecureFile",
+      "namespace": "public"
+    },
     "secureMessage": {
       "model": "SecureMessage",
       "namespace": "public"
@@ -271,6 +275,150 @@
               },
               "namespaceId": "public",
               "table": "loginEvent"
+            }
+          },
+          "SecureFile": {
+            "fields": {
+              "ciphertext": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bytea@1",
+                  "kind": "scalar"
+                }
+              },
+              "ciphertextBytes": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "iv": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "recipientId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "recipientWrappedKey": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "senderId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "senderWrappedKey": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "version": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "recipient": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "recipientId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "sender": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "senderId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "ciphertext": {
+                  "column": "ciphertext"
+                },
+                "ciphertextBytes": {
+                  "column": "ciphertextBytes"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "iv": {
+                  "column": "iv"
+                },
+                "recipientId": {
+                  "column": "recipientId"
+                },
+                "recipientWrappedKey": {
+                  "column": "recipientWrappedKey"
+                },
+                "senderId": {
+                  "column": "senderId"
+                },
+                "senderWrappedKey": {
+                  "column": "senderWrappedKey"
+                },
+                "version": {
+                  "column": "version"
+                }
+              },
+              "namespaceId": "public",
+              "table": "secureFile"
             }
           },
           "SecureMessage": {
@@ -737,6 +885,148 @@
               },
               "uniques": []
             },
+            "secureFile": {
+              "columns": {
+                "ciphertext": {
+                  "codecId": "pg/bytea@1",
+                  "nativeType": "bytea",
+                  "nullable": false
+                },
+                "ciphertextBytes": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "iv": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "recipientId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "recipientWrappedKey": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "senderId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "senderWrappedKey": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "version": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "senderId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "secureFile"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "recipientId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "secureFile"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "recipientId"
+                  ],
+                  "name": "secureFile_recipientId_idx_c9527cf8",
+                  "prefix": "secureFile_recipientId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "recipientId",
+                    "senderId",
+                    "createdAt"
+                  ],
+                  "name": "secureFile_recipientId_senderId_createdAt_idx_fd885bcc",
+                  "prefix": "secureFile_recipientId_senderId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "senderId"
+                  ],
+                  "name": "secureFile_senderId_idx_4689c490",
+                  "prefix": "secureFile_senderId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "senderId",
+                    "recipientId",
+                    "createdAt"
+                  ],
+                  "name": "secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2",
+                  "prefix": "secureFile_senderId_recipientId_createdAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "secureMessage": {
               "columns": {
                 "ciphertext": {
@@ -941,10 +1231,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "7add09319d434993821f5c0a5b92f972d2d9257d8852a302943a730d9a47373f"
+    "storageHash": "5b4567bcd15f114f1a908a5248624a437df851b8c489c41781425c963fbba726"
   },
   "execution": {
-    "executionHash": "24b67d298624775fac489d759ea7ab567a13b0319d33276323ac47ea50e8b698",
+    "executionHash": "ba7b9f35547c1669d6b7525879a06af1980b3030efb3349f54557771e1eb00c8",
     "mutations": {
       "defaults": [
         {
@@ -967,6 +1257,17 @@
             "column": "id",
             "namespace": "public",
             "table": "loginEvent"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "secureFile"
           }
         },
         {

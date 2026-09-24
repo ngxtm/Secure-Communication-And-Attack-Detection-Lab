@@ -1,7 +1,7 @@
 # Secure Communication & Attack Detection Lab — MVP Specification
 
-- Version: 1.6
-- Updated: 2026-09-24
+- Version: 1.7
+- Updated: 2026-09-25
 - Status: Agreed MVP specification
 - Purpose: An educational simulation for the Network Security course
 
@@ -13,7 +13,7 @@ The project demonstrates these concepts separately:
 
 - TLS protects the connection between the client and server.
 - AES-256-GCM protects message and file contents.
-- RSA-OAEP wraps the AES key for the recipient. Messages also include a sender-wrapped copy so both participants can review the conversation.
+- RSA-OAEP wraps each AES key for the recipient. Messages and files also include a sender-wrapped copy so both participants can read their conversation.
 - Argon2id protects stored passwords.
 - Hashes and HMAC demonstrate different integrity checks.
 - Replay protection, brute-force detection, and rate limiting demonstrate how repeated or unusual requests can be detected.
@@ -117,33 +117,20 @@ The project uses one Docker Compose stack containing Next.js, NestJS, and Postgr
 4. The API stores only the ciphertext, IV, two wrapped AES keys, and conversation metadata.
 5. The client decrypts with its local private key. Modification of the ciphertext or authenticated metadata causes AES-GCM authentication to fail.
 
-This is the first slice of Phase 2. File transfer will reuse the client-side encryption envelope and add encrypted file metadata and a download flow.
+Text messaging is implemented with a separate AES-256-GCM envelope. File transfer below is the next completed slice of Phase 2; the client-side tamper demonstration remains the next security feature.
 
 ### File transfer
 
-1. Alice's client creates a random AES-256 key and a new nonce for this encryption operation.
-2. The client encrypts the file contents and filename with AES-256-GCM. Envelope-binding data such as the version, file ID, sender ID, and recipient ID is included as AAD.
-3. The client wraps the AES key with Bob's public key using RSA-OAEP and SHA-256.
-4. The client sends the envelope over HTTPS.
-5. The API validates the session and send permission, checks that the file ID/request ID has not been used, then stores the ciphertext, wrapped key, and metadata.
-6. Bob's client retrieves the envelope, unwraps the AES key with the private key, and decrypts the file. Modification of the ciphertext or tag must cause decryption to fail.
+1. Alice selects a file up to 8 MiB. Her browser creates a fresh AES-256 key and random 96-bit IV for that file.
+2. The browser puts the UTF-8 JSON filename metadata behind a 4-byte big-endian metadata length, appends the file bytes, and encrypts the complete payload with AES-256-GCM.
+3. The file AAD is `secure-file|v1|senderId|recipientId`. The AES-GCM output includes its authentication tag and the tag is stored with the ciphertext.
+4. The browser wraps the same AES key twice with RSA-OAEP/SHA-256: once for Alice and once for Bob, so both participants can decrypt it.
+5. The browser sends a multipart request containing the encrypted binary payload, IV, both wrapped keys, and recipient username. The multipart filename is the generic `encrypted.bin`; the original filename is inside the encrypted payload.
+6. The API requires a valid session and allowed Origin plus CSRF header, verifies that both accounts have registered public identities, enforces the size and envelope limits, and stores the binary ciphertext in PostgreSQL `bytea` through Prisma.
+7. An authenticated participant can list up to 50 recent file summaries for the conversation, then fetch a file envelope by ID. The API checks the participant against the recorded sender and recipient before returning ciphertext.
+8. The recipient unwraps the key and decrypts in the browser. The browser downloads the result as `application/octet-stream`; it does not preview or execute the file.
 
-Conceptual envelope:
-
-~~~json
-{
-  "version": "...",
-  "file_id": "...",
-  "sender_id": "...",
-  "recipient_id": "...",
-  "encrypted_payload": "...",
-  "wrapped_aes_key": "...",
-  "nonce": "...",
-  "request_id": "..."
-}
-~~~
-
-In the Web Crypto API, AES-GCM ciphertext includes the authentication tag. The implementation must specify how ciphertext and tag are serialized; it must not discard the tag.
+The plaintext file is limited to 8 MiB. The API can see sender, recipient, send time, and encrypted payload size, but not the original filename, file bytes, or MIME type. Since the API sees ciphertext, it cannot scan the file contents or verify their actual type.
 
 RSA-OAEP in this project is an educational model for wrapping an AES key. TLS 1.3 is a separate connection-protection layer and does not use this exact RSA key-wrapping flow. References: [RFC 8017](https://www.rfc-editor.org/rfc/rfc8017.html), [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446.html), [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final).
 
@@ -238,8 +225,9 @@ Never store passwords, session tokens, private keys, plaintext files, or HMAC se
 | PUT | /api/messages/identity | Register or explicitly replace a public identity |
 | POST | /api/messages | Send an encrypted text-message envelope |
 | GET | /api/messages/conversation/{username} | Get the 100 most recent ciphertexts |
-| POST | /api/files | Send an encrypted file envelope (planned) |
-| GET | /api/files/{file_id} | Let Bob retrieve an envelope |
+| POST | /api/files | Upload an encrypted file envelope (multipart; maximum plaintext size 8 MiB) |
+| GET | /api/files/conversation/{username} | List up to 50 encrypted file summaries without ciphertext |
+| GET | /api/files/{file_id} | Fetch the ciphertext envelope for a sender or recipient |
 | GET | /api/security/events | Read dashboard events, subject to authorization |
 | POST | /api/lab/scenarios/{scenario} | Run a scenario in lab mode |
 
@@ -272,10 +260,10 @@ Endpoints under /api/lab are available only to signed-in lab/admin accounts, enf
 
 ### Phase 2 — Secure messaging and file transfer
 
-- Complete secure text messaging first: public identity/fingerprint, private key in IndexedDB, AES-256-GCM encryption, RSA-OAEP key wrapping for both participants, and ciphertext storage/retrieval.
-- Verify the recipient fingerprint through an independent channel before trusting the public key.
-- Add file transfer next using the same envelope pattern.
-- Then add a client-side tamper scenario; AES-GCM must reject decryption when ciphertext/tag is modified.
+- [x] Complete secure text messaging: public identity/fingerprint, private key in IndexedDB, AES-256-GCM encryption, RSA-OAEP key wrapping for both participants, and ciphertext storage/retrieval.
+- [x] Verify the recipient fingerprint through an independent channel before trusting the public key.
+- [x] Add encrypted file transfer: AES-256-GCM, two RSA-OAEP key envelopes, participant-authorized retrieval, and local decryption/download.
+- Add a client-side tamper scenario; AES-GCM must reject decryption when ciphertext/tag is modified.
 
 ### Phase 3 — Attack simulation and dashboard
 

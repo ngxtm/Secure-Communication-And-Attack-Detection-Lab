@@ -56,7 +56,7 @@ For the demo, log in as Alice and open Messages, then log out, log in as Bob, an
 
 Each message gets a fresh AES-256-GCM key and 96-bit IV. The client wraps that AES key separately for Alice and Bob with RSA-OAEP/SHA-256, so both participants can read the conversation. The API stores ciphertext, the IV, both wrapped keys, sender/recipient IDs, and time; it does not receive the message plaintext or either private key.
 
-Private keys are tied to this browser profile. Clearing browser storage or moving to another device can make old messages unreadable. The explicit key recovery action updates the registered public identity, reusing a locally stored key when one is available or creating a new one otherwise; messages remain readable only if their original private keys still exist locally. The fingerprint step helps detect a substituted public key; accepting the first fingerprint without comparing it independently does not verify the other person's identity.
+Private keys are tied to this browser profile. Clearing browser storage or moving to another device can make old messages and files unreadable. The explicit key recovery action updates the registered public identity, reusing a locally stored key when one is available or creating a new one otherwise; old content remains readable only if its original private keys still exist locally. The fingerprint step helps detect a substituted public key; accepting the first fingerprint without comparing it independently does not verify the other person's identity.
 
 Message endpoints:
 
@@ -65,6 +65,25 @@ Message endpoints:
 - `PUT /api/messages/identity` — publish an identity; replacement requires an explicit rotation flag.
 - `POST /api/messages` — store an encrypted message envelope.
 - `GET /api/messages/conversation/{username}` — retrieve up to 100 recent ciphertext envelopes.
+
+## Encrypted file transfer demo
+
+Use the **Encrypted file transfer** section on the Messages page after both Alice and Bob have created their encryption identities and the recipient fingerprint is verified.
+
+- Choose a file up to 8 MiB. The browser encrypts the file bytes and original filename together with AES-256-GCM using a fresh key and 96-bit IV.
+- RSA-OAEP/SHA-256 wraps the AES key separately for the sender and recipient. Both people can decrypt the same file using their local private key.
+- The API receives a multipart upload named `encrypted.bin` with ciphertext, IV, wrapped keys, and recipient username. It stores binary ciphertext in PostgreSQL `bytea`; it does not store the original filename or plaintext file.
+- The API exposes sender, recipient, upload time, and encrypted payload size so the page can list conversation files. Only those two participants can retrieve the encrypted envelope.
+- Either conversation participant can use **Download & decrypt** to decrypt locally and download as `application/octet-stream`. Files are never previewed or executed by the app.
+- Because the API sees only ciphertext, it cannot verify the real MIME type or scan file contents. Use fake course data in this lab.
+
+File endpoints:
+
+- `POST /api/files` — upload an encrypted multipart envelope; requires the session cookie, allowed Origin, and `X-CSRF-Protection: 1`.
+- `GET /api/files/conversation/{username}` — list up to 50 recent file summaries without ciphertext.
+- `GET /api/files/{id}` — return ciphertext and wrapped keys to a conversation participant.
+
+After pulling schema changes, run `pnpm compose:up` when you are ready; Compose applies the checked-in file-transfer migration before starting the app.
 
 ## Prisma ORM 8
 
@@ -83,7 +102,7 @@ Prisma ORM 8 is currently a release candidate. Package versions are locked in `p
 
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Compose creates the local PostgreSQL database/container from these values.
 - `SEED_ALICE_PASSWORD`, `SEED_BOB_PASSWORD`: required demo credentials (20-128 bytes); do not commit real values.
-- `WEB_ORIGINS`: comma-separated allowed browser origins for login/logout and secure-message writes. The local defaults cover the web app and Swagger UI.
+- `WEB_ORIGINS`: comma-separated allowed browser origins for login/logout and secure message/file writes. The local defaults cover the web app and Swagger UI.
 - `API_INTERNAL_URL`: API URL reachable from the Next.js server. Keep `http://api:3000` under Compose.
 - `SESSION_COOKIE_SECURE`: enable for HTTPS deployments.
 - `WEB_PORT`, `API_PORT`: local host ports.

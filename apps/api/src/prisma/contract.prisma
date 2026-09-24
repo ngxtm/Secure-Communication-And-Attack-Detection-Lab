@@ -59,3 +59,21 @@ model SecureMessage {
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, senderId, createdAt])
 }
+
+model SecureFile {
+  id                  String   @id @default(cuid(2))
+  senderId            String
+  recipientId         String
+  version             Int      @default(1)
+  ciphertext          Bytes
+  ciphertextBytes     Int
+  iv                  String
+  senderWrappedKey    String
+  recipientWrappedKey String
+  createdAt           TimestamptzString @default(now())
+  sender              User     @relation("FileSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient           User     @relation("FileRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
+}

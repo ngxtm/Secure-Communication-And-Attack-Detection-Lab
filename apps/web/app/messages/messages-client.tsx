@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   createLocalIdentityKey,
+  decryptFile,
   decryptMessage,
+  encryptFile,
   encryptMessage,
   getLocalIdentityKeys,
   saveLocalIdentityKey,
+  type EncryptedFileEnvelope,
   type LocalIdentityKey,
   type MessageCiphertext,
 } from "./crypto";
@@ -36,6 +39,20 @@ interface MessageResponse {
   };
 }
 
+type StoredFileSummary = Pick<
+  EncryptedFileEnvelope,
+  "id" | "senderId" | "recipientId" | "ciphertextBytes" | "createdAt"
+>;
+
+interface FileResponse {
+  files: StoredFileSummary[];
+  conversationWith: {
+    id: string;
+    username: string;
+    displayName: string;
+  };
+}
+
 interface DisplayMessage extends MessageCiphertext {
   plaintext: string | null;
 }
@@ -52,6 +69,14 @@ const mutationHeaders = {
 
 function trustedFingerprintKey(userId: string): string {
   return `nsl:trusted-public-key:${userId}`;
+}
+
+function formatEncryptedSize(bytes: number): string {
+  return (
+    new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(
+      bytes / 1024,
+    ) + " KiB encrypted"
+  );
 }
 
 async function responseError(response: Response): Promise<string> {
@@ -80,8 +105,7 @@ function matchingLocalKey(
 
 export default function MessagesClient() {
   const [authState, setAuthState] = useState<AuthState>("checking");
-  const [identityState, setIdentityState] =
-    useState<IdentityState>("checking");
+  const [identityState, setIdentityState] = useState<IdentityState>("checking");
   const [peerState, setPeerState] = useState<PeerState>("checking");
   const [peerTrustState, setPeerTrustState] =
     useState<PeerTrustState>("unverified");
@@ -100,6 +124,14 @@ export default function MessagesClient() {
   const [isSending, setIsSending] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [files, setFiles] = useState<StoredFileSummary[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(
+    null,
+  );
+  const [fileError, setFileError] = useState("");
+  const [fileNotice, setFileNotice] = useState("");
 
   const peerUsername =
     user?.username.toLowerCase() === "alice" ? "bob" : "alice";
@@ -299,6 +331,34 @@ export default function MessagesClient() {
     void refreshMessages();
   }, [refreshMessages]);
 
+  const refreshFiles = useCallback(async () => {
+    if (!user || !peerIdentity) return;
+
+    setFileError("");
+    try {
+      const response = await fetch(
+        "/api/files/conversation/" + encodeURIComponent(peerIdentity.username),
+        {
+          cache: "no-store",
+          credentials: "same-origin",
+        },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      const data = (await response.json()) as FileResponse;
+      setFiles(data.files);
+    } catch (error) {
+      setFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not load encrypted files.",
+      );
+    }
+  }, [peerIdentity, user]);
+
+  useEffect(() => {
+    void refreshFiles();
+  }, [refreshFiles]);
+
   async function confirmPeerFingerprint() {
     if (!peerIdentity) return;
 
@@ -362,7 +422,9 @@ export default function MessagesClient() {
       setIdentityState(
         matchingLocalKey(updatedKeys, result.identity) ? "ready" : "missing",
       );
-      setNotice("The public key has been updated. Previous private keys remain on this device.");
+      setNotice(
+        "The public key has been updated. Previous private keys remain on this device.",
+      );
     } catch (error) {
       setPageError(
         error instanceof Error
@@ -414,6 +476,105 @@ export default function MessagesClient() {
     }
   }
 
+  async function sendFile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSend || !user || !ownIdentity || !peerIdentity || !selectedFile) {
+      return;
+    }
+
+    const form = event.currentTarget;
+    setFileError("");
+    setFileNotice("");
+    setIsUploadingFile(true);
+    try {
+      const encrypted = await encryptFile(
+        selectedFile,
+        user.id,
+        peerIdentity.userId,
+        peerIdentity.publicKey,
+        ownIdentity.publicKey,
+      );
+      const formData = new FormData();
+      formData.append("recipientUsername", peerIdentity.username);
+      formData.append("iv", encrypted.iv);
+      formData.append("senderWrappedKey", encrypted.senderWrappedKey);
+      formData.append("recipientWrappedKey", encrypted.recipientWrappedKey);
+      formData.append(
+        "ciphertext",
+        new Blob([encrypted.ciphertext.buffer], {
+          type: "application/octet-stream",
+        }),
+        "encrypted.bin",
+      );
+
+      const response = await fetch("/api/files", {
+        method: "POST",
+        headers: { "X-CSRF-Protection": "1" },
+        credentials: "same-origin",
+        body: formData,
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+
+      setSelectedFile(null);
+      form.reset();
+      setFileNotice("Encrypted in this browser and uploaded as ciphertext.");
+      await refreshFiles();
+    } catch (error) {
+      setFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not encrypt and upload the file.",
+      );
+    } finally {
+      setIsUploadingFile(false);
+    }
+  }
+
+  async function downloadFile(fileId: string) {
+    if (!user) return;
+
+    setFileError("");
+    setFileNotice("");
+    setDownloadingFileId(fileId);
+    try {
+      const response = await fetch("/api/files/" + encodeURIComponent(fileId), {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+
+      const data = (await response.json()) as { file: EncryptedFileEnvelope };
+      const decrypted = await decryptFile(
+        data.file,
+        user.id,
+        localKeys.map((key) => key.privateKey),
+      );
+      const blob = new Blob([decrypted.bytes.buffer], {
+        type: "application/octet-stream",
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = decrypted.fileName;
+      link.rel = "noopener";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setFileNotice(
+        "Decrypted locally and downloaded " + decrypted.fileName + ".",
+      );
+    } catch (error) {
+      setFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not decrypt and download the file.",
+      );
+    } finally {
+      setDownloadingFileId(null);
+    }
+  }
+
   async function signOut() {
     setPageError("");
     try {
@@ -427,6 +588,8 @@ export default function MessagesClient() {
       setOwnIdentity(null);
       setPeerIdentity(null);
       setMessages([]);
+      setFiles([]);
+      setSelectedFile(null);
       setAuthState("signed-out");
       setNotice("Signed out and revoked the session.");
     } catch (error) {
@@ -461,7 +624,7 @@ export default function MessagesClient() {
 
           <div className="flex items-center gap-3">
             <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300">
-              Phase 2 · Secure Messaging
+              Phase 2 · Secure Messaging & Files
             </span>
             {user && (
               <>
@@ -490,8 +653,10 @@ export default function MessagesClient() {
                 Messages are readable only on a device with the matching key.
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-                The browser encrypts each message before sending. The API stores the ciphertext,
-                IV, and RSA-OAEP-wrapped AES keys for both people in the conversation.
+                The browser encrypts each message and file before sending. The
+                API stores ciphertext, the IV, and RSA-OAEP-wrapped AES keys for
+                both people in the conversation. File names are encrypted inside
+                the file payload.
               </p>
             </div>
 
@@ -505,8 +670,8 @@ export default function MessagesClient() {
               <div className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.06] p-5">
                 <h2 className="font-semibold">You are not signed in</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-300">
-                  Sign in as Alice or Bob first. Each account will create and store
-                  its own private key in this browser.
+                  Sign in as Alice or Bob first. Each account will create and
+                  store its own private key in this browser.
                 </p>
                 <Link
                   href="/login"
@@ -523,7 +688,10 @@ export default function MessagesClient() {
                 <p className="mt-2 text-sm leading-6 text-rose-100">
                   {pageError || "Check the API and PostgreSQL status."}
                 </p>
-                <Link href="/login" className="mt-4 inline-flex text-sm text-slate-200 underline underline-offset-4">
+                <Link
+                  href="/login"
+                  className="mt-4 inline-flex text-sm text-slate-200 underline underline-offset-4"
+                >
                   Back to sign in
                 </Link>
               </div>
@@ -554,9 +722,15 @@ export default function MessagesClient() {
                 >
                   <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
                     <div>
-                      <p className="font-mono text-xs text-emerald-200">MESSAGE / 01</p>
-                      <h2 id="conversation-heading" className="mt-1 text-lg font-semibold">
-                        Conversation with {peerIdentity?.displayName ?? peerUsername}
+                      <p className="font-mono text-xs text-emerald-200">
+                        MESSAGE / 01
+                      </p>
+                      <h2
+                        id="conversation-heading"
+                        className="mt-1 text-lg font-semibold"
+                      >
+                        Conversation with{" "}
+                        {peerIdentity?.displayName ?? peerUsername}
                       </h2>
                     </div>
                     <button
@@ -571,29 +745,40 @@ export default function MessagesClient() {
 
                   <div className="max-h-[32rem] min-h-64 space-y-3 overflow-y-auto px-4 py-5 sm:px-6">
                     {peerState === "checking" && (
-                      <p className="text-sm text-slate-400">Loading the public key for {peerUsername}…</p>
+                      <p className="text-sm text-slate-400">
+                        Loading the public key for {peerUsername}…
+                      </p>
                     )}
                     {peerState === "missing" && (
                       <div className="rounded-2xl border border-amber-200/20 bg-amber-200/[0.05] p-4 text-sm leading-6 text-amber-100">
-                        {peerUsername} has not created an encryption identity yet. Sign out,
-                        sign in as that account, and open Messages once.
+                        {peerUsername} has not created an encryption identity
+                        yet. Sign out, sign in as that account, and open
+                        Messages once.
                       </div>
                     )}
                     {conversationError && (
-                      <p role="alert" className="text-sm leading-6 text-rose-200">
+                      <p
+                        role="alert"
+                        className="text-sm leading-6 text-rose-200"
+                      >
                         {conversationError}
                       </p>
                     )}
-                    {peerState === "ready" && messages.length === 0 && !isLoadingMessages && (
-                      <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-white/10 px-5 text-center">
-                        <div>
-                          <p className="text-sm font-medium text-slate-200">No messages yet</p>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">
-                            Verify the recipient fingerprint to enable messaging.
-                          </p>
+                    {peerState === "ready" &&
+                      messages.length === 0 &&
+                      !isLoadingMessages && (
+                        <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-white/10 px-5 text-center">
+                          <div>
+                            <p className="text-sm font-medium text-slate-200">
+                              No messages yet
+                            </p>
+                            <p className="mt-2 text-xs leading-5 text-slate-400">
+                              Verify the recipient fingerprint to enable
+                              messaging.
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {messages.map((message) => {
                       const isOwnMessage = message.senderId === user?.id;
@@ -604,10 +789,13 @@ export default function MessagesClient() {
                         >
                           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                             <p className="text-xs font-semibold text-slate-200">
-                              {isOwnMessage ? "You" : peerIdentity?.displayName ?? peerUsername}
+                              {isOwnMessage
+                                ? "You"
+                                : (peerIdentity?.displayName ?? peerUsername)}
                             </p>
                             <time className="font-mono text-[10px] text-slate-500">
-                              {message.createdAt.replace("T", " ").slice(0, 16)} UTC
+                              {message.createdAt.replace("T", " ").slice(0, 16)}{" "}
+                              UTC
                             </time>
                           </div>
                           {message.plaintext !== null ? (
@@ -616,7 +804,8 @@ export default function MessagesClient() {
                             </p>
                           ) : (
                             <p className="mt-2 text-sm leading-6 text-amber-100">
-                              Could not decrypt: the key is incorrect or GCM detected modified data.
+                              Could not decrypt: the key is incorrect or GCM
+                              detected modified data.
                             </p>
                           )}
                           <details className="mt-3 border-t border-white/[0.08] pt-2">
@@ -625,19 +814,29 @@ export default function MessagesClient() {
                             </summary>
                             <dl className="mt-3 grid gap-2 text-[11px]">
                               <div>
-                                <dt className="text-slate-500">AES-GCM ciphertext</dt>
+                                <dt className="text-slate-500">
+                                  AES-GCM ciphertext
+                                </dt>
                                 <dd className="mt-1 break-all font-mono text-slate-300">
                                   {message.ciphertext.slice(0, 112)}…
                                 </dd>
                               </div>
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <dt className="text-slate-500">IV · base64url</dt>
-                                  <dd className="mt-1 break-all font-mono text-slate-300">{message.iv}</dd>
+                                  <dt className="text-slate-500">
+                                    IV · base64url
+                                  </dt>
+                                  <dd className="mt-1 break-all font-mono text-slate-300">
+                                    {message.iv}
+                                  </dd>
                                 </div>
                                 <div>
-                                  <dt className="text-slate-500">RSA envelopes</dt>
-                                  <dd className="mt-1 font-mono text-slate-300">2 × 256 bytes</dd>
+                                  <dt className="text-slate-500">
+                                    RSA envelopes
+                                  </dt>
+                                  <dd className="mt-1 font-mono text-slate-300">
+                                    2 × 256 bytes
+                                  </dd>
                                 </div>
                               </div>
                             </dl>
@@ -647,8 +846,14 @@ export default function MessagesClient() {
                     })}
                   </div>
 
-                  <form onSubmit={sendMessage} className="border-t border-white/10 bg-slate-950/25 p-4 sm:p-5">
-                    <label htmlFor="message" className="mb-2 block text-xs font-medium text-slate-300">
+                  <form
+                    onSubmit={sendMessage}
+                    className="border-t border-white/10 bg-slate-950/25 p-4 sm:p-5"
+                  >
+                    <label
+                      htmlFor="message"
+                      className="mb-2 block text-xs font-medium text-slate-300"
+                    >
                       Message · up to 16 KiB UTF-8
                     </label>
                     <textarea
@@ -666,7 +871,11 @@ export default function MessagesClient() {
                       </p>
                       <button
                         type="submit"
-                        disabled={!canSend || isSending || messageText.trim().length === 0}
+                        disabled={
+                          !canSend ||
+                          isSending ||
+                          messageText.trim().length === 0
+                        }
                         className="min-h-11 rounded-full bg-emerald-200 px-5 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
                       >
                         {isSending ? "Encrypting…" : "Encrypt and send"}
@@ -674,10 +883,140 @@ export default function MessagesClient() {
                     </div>
                     {!canSend && peerState === "ready" && (
                       <p className="mt-3 text-xs leading-5 text-amber-100/80">
-                        A local private key and a verified recipient fingerprint are required before sending.
+                        A local private key and a verified recipient fingerprint
+                        are required before sending.
                       </p>
                     )}
                   </form>
+                </section>
+                <section
+                  aria-labelledby="files-heading"
+                  className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035]"
+                >
+                  <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
+                    <div>
+                      <p className="font-mono text-xs text-emerald-200">
+                        FILES / 03
+                      </p>
+                      <h2
+                        id="files-heading"
+                        className="mt-1 text-lg font-semibold"
+                      >
+                        Encrypted file transfer
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void refreshFiles()}
+                      disabled={!peerIdentity || isUploadingFile}
+                      className="min-h-9 rounded-full border border-white/15 px-3 text-xs font-medium text-slate-200 hover:bg-white/[0.07] disabled:cursor-wait disabled:opacity-50"
+                    >
+                      Refresh files
+                    </button>
+                  </header>
+
+                  <div className="space-y-3 px-5 py-4 sm:px-6">
+                    {fileError && (
+                      <p
+                        role="alert"
+                        className="text-sm leading-6 text-rose-200"
+                      >
+                        {fileError}
+                      </p>
+                    )}
+                    {fileNotice && (
+                      <p
+                        role="status"
+                        className="text-sm leading-6 text-emerald-100"
+                      >
+                        {fileNotice}
+                      </p>
+                    )}
+                    {files.length === 0 ? (
+                      <p className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-slate-400">
+                        No encrypted files in this conversation yet.
+                      </p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {files.map((file) => (
+                          <li
+                            key={file.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-slate-100">
+                                {file.senderId === user?.id
+                                  ? "Sent by you"
+                                  : "Sent by " +
+                                    (peerIdentity?.displayName ?? peerUsername)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">
+                                {formatEncryptedSize(file.ciphertextBytes)} ·{" "}
+                                {file.createdAt.replace("T", " ").slice(0, 16)}{" "}
+                                UTC
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void downloadFile(file.id)}
+                              disabled={
+                                !activeLocalKey || downloadingFileId !== null
+                              }
+                              className="min-h-9 rounded-full border border-emerald-200/25 px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-200/[0.08] disabled:cursor-wait disabled:opacity-50"
+                            >
+                              {downloadingFileId === file.id
+                                ? "Decrypting…"
+                                : "Download & decrypt"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <form
+                      onSubmit={sendFile}
+                      className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                    >
+                      <div>
+                        <label
+                          htmlFor="encrypted-file"
+                          className="mb-2 block text-xs font-medium text-slate-300"
+                        >
+                          Choose a file · maximum 8 MiB
+                        </label>
+                        <input
+                          id="encrypted-file"
+                          type="file"
+                          onChange={(event) =>
+                            setSelectedFile(
+                              event.currentTarget.files?.[0] ?? null,
+                            )
+                          }
+                          className="block min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-3 file:py-1 file:text-xs file:font-medium file:text-slate-100"
+                        />
+                        <p className="mt-2 text-xs leading-5 text-slate-500">
+                          The browser encrypts the content and original file
+                          name. The API receives only ciphertext and participant
+                          metadata.
+                        </p>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!canSend || isUploadingFile || !selectedFile}
+                        className="min-h-11 rounded-full bg-emerald-200 px-5 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {isUploadingFile
+                          ? "Encrypting & uploading…"
+                          : "Encrypt and send file"}
+                      </button>
+                    </form>
+                    {!canSend && peerState === "ready" && (
+                      <p className="text-xs leading-5 text-amber-100/80">
+                        A local private key and a verified recipient fingerprint
+                        are required before sending files.
+                      </p>
+                    )}
+                  </div>
                 </section>
               </>
             )}
@@ -688,8 +1027,12 @@ export default function MessagesClient() {
               <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-mono text-xs text-emerald-200">KEYS / 01</p>
-                    <h2 className="mt-1 text-lg font-semibold">Encryption identity</h2>
+                    <p className="font-mono text-xs text-emerald-200">
+                      KEYS / 01
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold">
+                      Encryption identity
+                    </h2>
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-[11px] ${identityState === "ready" ? "bg-emerald-300/10 text-emerald-100" : "bg-amber-200/10 text-amber-100"}`}
@@ -728,8 +1071,8 @@ export default function MessagesClient() {
                 {identityState === "missing" && (
                   <div className="mt-4 rounded-2xl border border-amber-200/20 bg-amber-200/[0.05] p-4">
                     <p className="text-xs leading-5 text-amber-100">
-                      The server has the public key, but this browser has no matching private key.
-                      Old messages may not be decryptable.
+                      The server has the public key, but this browser has no
+                      matching private key. Old messages may not be decryptable.
                     </p>
                     <button
                       type="button"
@@ -746,8 +1089,12 @@ export default function MessagesClient() {
               <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-mono text-xs text-emerald-200">TRUST / 02</p>
-                    <h2 className="mt-1 text-lg font-semibold">Verify recipient</h2>
+                    <p className="font-mono text-xs text-emerald-200">
+                      TRUST / 02
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold">
+                      Verify recipient
+                    </h2>
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-[11px] ${peerTrustState === "trusted" ? "bg-emerald-300/10 text-emerald-100" : "bg-amber-200/10 text-amber-100"}`}
@@ -771,20 +1118,23 @@ export default function MessagesClient() {
                       SHA-256: {peerIdentity.fingerprint}
                     </code>
                     <p className="mt-3 text-xs leading-5 text-slate-400">
-                      Compare this value with the fingerprint shown in {peerUsername}'s account,
-                      using another channel. The server distributes the public key but does not authenticate its owner.
+                      Compare this value with the fingerprint shown in{" "}
+                      {peerUsername}'s account, using another channel. The
+                      server distributes the public key but does not
+                      authenticate its owner.
                     </p>
-                    {peerTrustState !== "trusted" && peerTrustState !== "unavailable" && (
-                      <button
-                        type="button"
-                        onClick={confirmPeerFingerprint}
-                        className="mt-4 min-h-10 w-full rounded-xl border border-white/15 px-3 text-xs font-semibold text-slate-100 hover:bg-white/[0.06]"
-                      >
-                        {peerTrustState === "changed"
-                          ? "Accept the new fingerprint after verification"
-                          : "Compared · confirm fingerprint"}
-                      </button>
-                    )}
+                    {peerTrustState !== "trusted" &&
+                      peerTrustState !== "unavailable" && (
+                        <button
+                          type="button"
+                          onClick={confirmPeerFingerprint}
+                          className="mt-4 min-h-10 w-full rounded-xl border border-white/15 px-3 text-xs font-semibold text-slate-100 hover:bg-white/[0.06]"
+                        >
+                          {peerTrustState === "changed"
+                            ? "Accept the new fingerprint after verification"
+                            : "Compared · confirm fingerprint"}
+                        </button>
+                      )}
                   </>
                 ) : (
                   <p className="mt-4 text-sm leading-6 text-slate-400">
@@ -798,15 +1148,24 @@ export default function MessagesClient() {
               </section>
 
               <section className="rounded-3xl border border-emerald-200/15 bg-emerald-200/[0.045] p-5">
-                <p className="font-mono text-xs text-emerald-200">SERVER VIEW</p>
+                <p className="font-mono text-xs text-emerald-200">
+                  SERVER VIEW
+                </p>
                 <h2 className="mt-2 font-semibold">Data received by the API</h2>
                 <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
                   <li>• AES-GCM ciphertext and a random 96-bit IV</li>
                   <li>• AES key wrapped with RSA for Alice and Bob</li>
-                  <li>• Sender/recipient IDs and send time</li>
+                  <li>
+                    • Sender/recipient IDs, send time, and encrypted file size
+                  </li>
+                  <li>
+                    • File names and file contents remain inside the encrypted
+                    payload
+                  </li>
                 </ul>
                 <p className="mt-3 border-t border-white/10 pt-3 text-xs leading-5 text-slate-400">
-                  GCM authenticates the ciphertext and metadata. Modified data will fail decryption.
+                  GCM authenticates the ciphertext and metadata. Modified data
+                  will fail decryption.
                 </p>
               </section>
             </aside>
