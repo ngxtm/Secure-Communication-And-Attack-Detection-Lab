@@ -1,6 +1,6 @@
 # Secure Communication & Attack Detection Lab — MVP Specification
 
-- Version: 1.7
+- Version: 1.9
 - Updated: 2026-09-25
 - Status: Agreed MVP specification
 - Purpose: An educational simulation for the Network Security course
@@ -117,7 +117,7 @@ The project uses one Docker Compose stack containing Next.js, NestJS, and Postgr
 4. The API stores only the ciphertext, IV, two wrapped AES keys, and conversation metadata.
 5. The client decrypts with its local private key. Modification of the ciphertext or authenticated metadata causes AES-GCM authentication to fail.
 
-Text messaging is implemented with a separate AES-256-GCM envelope. File transfer below is the next completed slice of Phase 2; the client-side tamper demonstration remains the next security feature.
+Text messaging, encrypted file transfer, and the client-side tamper simulation are implemented slices of Phase 2. Other attack scenarios and the security dashboard remain planned.
 
 ### File transfer
 
@@ -125,10 +125,12 @@ Text messaging is implemented with a separate AES-256-GCM envelope. File transfe
 2. The browser puts the UTF-8 JSON filename metadata behind a 4-byte big-endian metadata length, appends the file bytes, and encrypts the complete payload with AES-256-GCM.
 3. The file AAD is `secure-file|v1|senderId|recipientId`. The AES-GCM output includes its authentication tag and the tag is stored with the ciphertext.
 4. The browser wraps the same AES key twice with RSA-OAEP/SHA-256: once for Alice and once for Bob, so both participants can decrypt it.
-5. The browser sends a multipart request containing the encrypted binary payload, IV, both wrapped keys, and recipient username. The multipart filename is the generic `encrypted.bin`; the original filename is inside the encrypted payload.
-6. The API requires a valid session and allowed Origin plus CSRF header, verifies that both accounts have registered public identities, enforces the size and envelope limits, and stores the binary ciphertext in PostgreSQL `bytea` through Prisma.
+5. The browser sends a multipart request containing a fresh UUIDv4 request ID, the encrypted binary payload, IV, both wrapped keys, and recipient username. The multipart filename is the generic `encrypted.bin`; the original filename is inside the encrypted payload.
+6. The API requires a valid session and allowed Origin plus CSRF header, verifies that both accounts have registered public identities, enforces the size and envelope limits, and stores the binary ciphertext in PostgreSQL `bytea` through Prisma. The server binds the request ID to the authenticated session ID; it never trusts a session ID supplied by the client.
 7. An authenticated participant can list up to 50 recent file summaries for the conversation, then fetch a file envelope by ID. The API checks the participant against the recorded sender and recipient before returning ciphertext.
 8. The recipient unwraps the key and decrypts in the browser. The browser downloads the result as `application/octet-stream`; it does not preview or execute the file.
+9. The tamper control clones the fetched envelope in browser memory, flips one bit in the ciphertext, and passes the copy to the normal decryption function. AES-GCM rejects the modified copy. The original database record is never changed.
+10. After the expected decryption failure, the browser reports the outcome to `POST /api/files/{file_id}/tamper-report`. The API authenticates the session, checks file-participant access, and records `FILE_DECRYPTION_FAILED_REPORTED` with source `client-reported` and sanitized scenario details.
 
 The plaintext file is limited to 8 MiB. The API can see sender, recipient, send time, and encrypted payload size, but not the original filename, file bytes, or MIME type. Since the API sees ciphertext, it cannot scan the file contents or verify their actual type.
 
@@ -164,7 +166,9 @@ References: [RFC 2104 — HMAC](https://www.rfc-editor.org/rfc/rfc2104.html), [R
 
 ## 8. Replay protection
 
-Each file-send operation has a random request ID. The server stores each user/session and request-ID pair for the lifetime of the session. If a used request is sent again, the server returns 409 REPLAY_DETECTED, does not create another file, and records a security event. A unique file ID also prevents duplicate records in the database.
+Each file-send operation has a random UUIDv4 request ID. The server stores the authenticated session ID and request-ID pair with the file envelope, with a PostgreSQL unique constraint on `(sessionId, requestId)`. The database constraint makes simultaneous duplicates fail atomically. Existing file rows can keep null request IDs during the additive migration; all uploads through the new API must include both values. If a used request is sent again in the same session, the server returns HTTP 409 `REPLAY_DETECTED`, does not create another file, and records `FILE_REPLAY_BLOCKED`.
+
+Both the in-app Attack Simulator and Burp Repeater submit the same accepted upload again with its original request ID. The simulator retains only the latest successful encrypted envelope in browser memory. In Burp, capture a successful `POST /api/files` from the Proxy history, send it to Repeater, and resend it unchanged while the session is still valid. A fresh request ID represents a new send operation; the ID is a deduplication token, not a signature over the envelope.
 
 The AES-GCM nonce and request ID serve different purposes:
 
@@ -175,14 +179,14 @@ The simulator replays a valid request captured in the lab. This models replay at
 
 ## 9. Attack Simulator and detection rules
 
-| Scenario | Action | Expected result |
-|---|---|---|
-| Plain HTTP demo | Send a fake string through the lab endpoint | Wireshark can read the payload |
-| HTTPS demo | Send the same fake string over TLS | A packet capture cannot read the application payload |
-| Tamper | Modify an envelope's ciphertext or tag | The client cannot decrypt it; the event is marked client-reported |
-| Replay | Resend a used request ID | The API returns 409, creates no duplicate file, and records REPLAY_BLOCKED |
-| Brute-force | Submit repeated fake passwords | Cooldown/rate limit and AUTH_LOCKED |
-| Bounded flood | Send requests to the demo endpoint at a limited rate | The API returns 429 above the threshold and records RATE_LIMITED |
+| Scenario        | Action                                                                          | Expected result                                                                                      |
+| --------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Plain HTTP demo | Send a fake string through the lab endpoint                                     | Wireshark can read the payload                                                                       |
+| HTTPS demo      | Send the same fake string over TLS                                              | A packet capture cannot read the application payload                                                 |
+| Tamper          | The browser flips one bit in an in-memory copy of a file ciphertext             | AES-GCM rejects the modified copy; the original stays intact and the event is marked client-reported |
+| Replay          | Attack Simulator or Burp Repeater resends a used request ID in the same session | The API returns 409 `REPLAY_DETECTED`, creates no duplicate file, and records `FILE_REPLAY_BLOCKED`  |
+| Brute-force     | Submit repeated fake passwords                                                  | Cooldown/rate limit and AUTH_LOCKED                                                                  |
+| Bounded flood   | Send requests to the demo endpoint at a limited rate                            | The API returns 429 above the threshold and records RATE_LIMITED                                     |
 
 Simulator limits: at most 10 requests per second and 100 requests per run. It targets only this project's API and does not accept arbitrary destination URLs. Scenarios require an authenticated lab session and use fake payloads. Default demo rate limit: more than 20 requests in five seconds from the same source triggers a 30-second cooldown.
 
@@ -216,20 +220,21 @@ Never store passwords, session tokens, private keys, plaintext files, or HMAC se
 
 ## 11. Proposed API
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | /api/auth/login | Sign in |
-| POST | /api/auth/logout | Revoke the session |
-| GET | /api/messages/identity | Get the signed-in account's public identity |
-| GET | /api/messages/identity/{username} | Get another account's public identity |
-| PUT | /api/messages/identity | Register or explicitly replace a public identity |
-| POST | /api/messages | Send an encrypted text-message envelope |
-| GET | /api/messages/conversation/{username} | Get the 100 most recent ciphertexts |
-| POST | /api/files | Upload an encrypted file envelope (multipart; maximum plaintext size 8 MiB) |
-| GET | /api/files/conversation/{username} | List up to 50 encrypted file summaries without ciphertext |
-| GET | /api/files/{file_id} | Fetch the ciphertext envelope for a sender or recipient |
-| GET | /api/security/events | Read dashboard events, subject to authorization |
-| POST | /api/lab/scenarios/{scenario} | Run a scenario in lab mode |
+| Method | Endpoint                              | Purpose                                                                                              |
+| ------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| POST   | /api/auth/login                       | Sign in                                                                                              |
+| POST   | /api/auth/logout                      | Revoke the session                                                                                   |
+| GET    | /api/messages/identity                | Get the signed-in account's public identity                                                          |
+| GET    | /api/messages/identity/{username}     | Get another account's public identity                                                                |
+| PUT    | /api/messages/identity                | Register or explicitly replace a public identity                                                     |
+| POST   | /api/messages                         | Send an encrypted text-message envelope                                                              |
+| GET    | /api/messages/conversation/{username} | Get the 100 most recent ciphertexts                                                                  |
+| POST   | /api/files                            | Upload an encrypted file envelope with a UUIDv4 request ID (multipart; maximum plaintext size 8 MiB) |
+| GET    | /api/files/conversation/{username}    | List up to 50 encrypted file summaries without ciphertext                                            |
+| GET    | /api/files/{file_id}                  | Fetch the ciphertext envelope for a sender or recipient                                              |
+| POST   | /api/files/{file_id}/tamper-report    | Record a sanitized client-reported decryption failure for a participant                              |
+| GET    | /api/security/events                  | Read dashboard events, subject to authorization                                                      |
+| POST   | /api/lab/scenarios/{scenario}         | Run a scenario in lab mode                                                                           |
 
 API documentation is served through Swagger UI at /docs; the OpenAPI JSON document is available at /docs-json. NestJS routes can be configured.
 

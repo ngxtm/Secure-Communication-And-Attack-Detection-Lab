@@ -1,0 +1,239 @@
+[
+  {
+    "id": "table.securityEvent",
+    "label": "Create table \"securityEvent\"",
+    "summary": "Creates table \"securityEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "securityEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"securityEvent\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"securityEvent\"",
+        "sql": "CREATE TABLE \"public\".\"securityEvent\" (\n  \"actorId\" text,\n  \"details\" text DEFAULT '{}' NOT NULL,\n  \"eventType\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"occurredAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"referenceId\" text,\n  \"severity\" text NOT NULL,\n  \"source\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"securityEvent\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.securityEvent.securityEvent_actorId_idx_a58f6b4b",
+    "label": "Create index \"securityEvent_actorId_idx_a58f6b4b\" on \"securityEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "securityEvent_actorId_idx_a58f6b4b",
+        "table": "securityEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"securityEvent_actorId_idx_a58f6b4b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_actorId_idx_a58f6b4b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"securityEvent_actorId_idx_a58f6b4b\"",
+        "sql": "CREATE INDEX \"securityEvent_actorId_idx_a58f6b4b\" ON \"public\".\"securityEvent\" (\"actorId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"securityEvent_actorId_idx_a58f6b4b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_actorId_idx_a58f6b4b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.securityEvent.securityEvent_actorId_occurredAt_idx_38439793",
+    "label": "Create index \"securityEvent_actorId_occurredAt_idx_38439793\" on \"securityEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "securityEvent_actorId_occurredAt_idx_38439793",
+        "table": "securityEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"securityEvent_actorId_occurredAt_idx_38439793\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_actorId_occurredAt_idx_38439793\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"securityEvent_actorId_occurredAt_idx_38439793\"",
+        "sql": "CREATE INDEX \"securityEvent_actorId_occurredAt_idx_38439793\" ON \"public\".\"securityEvent\" (\"actorId\", \"occurredAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"securityEvent_actorId_occurredAt_idx_38439793\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_actorId_occurredAt_idx_38439793\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.securityEvent.securityEvent_eventType_occurredAt_idx_d85e1cc5",
+    "label": "Create index \"securityEvent_eventType_occurredAt_idx_d85e1cc5\" on \"securityEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "securityEvent_eventType_occurredAt_idx_d85e1cc5",
+        "table": "securityEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"securityEvent_eventType_occurredAt_idx_d85e1cc5\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_eventType_occurredAt_idx_d85e1cc5\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"securityEvent_eventType_occurredAt_idx_d85e1cc5\"",
+        "sql": "CREATE INDEX \"securityEvent_eventType_occurredAt_idx_d85e1cc5\" ON \"public\".\"securityEvent\" (\"eventType\", \"occurredAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"securityEvent_eventType_occurredAt_idx_d85e1cc5\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_eventType_occurredAt_idx_d85e1cc5\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.securityEvent.securityEvent_referenceId_eventType_occurredAt_idx_ae488262",
+    "label": "Create index \"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\" on \"securityEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "securityEvent_referenceId_eventType_occurredAt_idx_ae488262",
+        "table": "securityEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\"",
+        "sql": "CREATE INDEX \"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\" ON \"public\".\"securityEvent\" (\"referenceId\", \"eventType\", \"occurredAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"securityEvent_referenceId_eventType_occurredAt_idx_ae488262\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.securityEvent.securityEvent_actorId_fkey",
+    "label": "Add foreign key \"securityEvent_actorId_fkey\" on \"securityEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "securityEvent_actorId_fkey",
+        "table": "securityEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"securityEvent_actorId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "securityEvent_actorId_fkey",
+          "public",
+          "\"public\".\"securityEvent\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"securityEvent_actorId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"securityEvent\"\nADD CONSTRAINT \"securityEvent_actorId_fkey\"\nFOREIGN KEY (\"actorId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE SET NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"securityEvent_actorId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "securityEvent_actorId_fkey",
+          "public",
+          "\"public\".\"securityEvent\""
+        ]
+      }
+    ]
+  }
+]

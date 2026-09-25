@@ -1,0 +1,128 @@
+[
+  {
+    "id": "column.public.secureFile.requestId",
+    "label": "Add column \"requestId\" to \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "requestId",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"requestId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "secureFile",
+          "requestId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"requestId\"",
+        "sql": "ALTER TABLE \"public\".\"secureFile\" ADD COLUMN \"requestId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"requestId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "secureFile",
+          "requestId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.secureFile.sessionId",
+    "label": "Add column \"sessionId\" to \"secureFile\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "sessionId",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"sessionId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "secureFile",
+          "sessionId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"sessionId\"",
+        "sql": "ALTER TABLE \"public\".\"secureFile\" ADD COLUMN \"sessionId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"sessionId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "secureFile",
+          "sessionId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.secureFile.secureFile_sessionId_requestId_key",
+    "label": "Add unique constraint on \"secureFile\" (sessionId, requestId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "secureFile_sessionId_requestId_key",
+        "table": "secureFile"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"secureFile_sessionId_requestId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureFile_sessionId_requestId_key",
+          "public",
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"secureFile_sessionId_requestId_key\"",
+        "sql": "ALTER TABLE \"public\".\"secureFile\" ADD CONSTRAINT \"secureFile_sessionId_requestId_key\" UNIQUE (\"sessionId\", \"requestId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"secureFile_sessionId_requestId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "secureFile_sessionId_requestId_key",
+          "public",
+          "\"public\".\"secureFile\""
+        ]
+      }
+    ]
+  }
+]

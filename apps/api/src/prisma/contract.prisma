@@ -1,79 +1,97 @@
 // use prisma-8
-
 model User {
-  id           String   @id @default(cuid(2))
-  username     String   @unique
+  id           String                     @id @default(cuid(2))
+  username     String                     @unique
   displayName  String
   passwordHash String
-  role         String   @default("user")
-  createdAt    TimestamptzString @default(now())
+  role         String                     @default("user")
+  createdAt    TimestamptzString          @default(now())
   updatedAt    temporal.updatedAtString()
 }
 
 model AuthSession {
-  id        String   @id @default(cuid(2))
-  tokenHash String   @unique
+  id        String             @id @default(cuid(2))
+  tokenHash String             @unique
   userId    String
-  createdAt TimestamptzString @default(now())
+  createdAt TimestamptzString  @default(now())
   expiresAt TimestamptzString
   revokedAt TimestamptzString?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields:[userId], references:[id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }
 
 model LoginEvent {
-  id        String   @id @default(cuid(2))
-  username  String
-  userId    String?
-  eventType String
-  source    String
+  id         String            @id @default(cuid(2))
+  username   String
+  userId     String?
+  eventType  String
+  source     String
   occurredAt TimestamptzString @default(now())
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user       User?             @relation(fields:[userId], references:[id], onDelete: SetNull)
 
   @@index([username, eventType, occurredAt])
   @@index([userId, occurredAt])
 }
 
 model CryptoIdentity {
-  userId      String   @id
+  userId      String            @id
   publicKey   String
-  fingerprint String   @unique
+  fingerprint String            @unique
   createdAt   TimestamptzString @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields:[userId], references:[id], onDelete: Cascade)
 }
 
 model SecureMessage {
-  id          String   @id @default(cuid(2))
-  senderId    String
-  recipientId String
-  version     Int      @default(1)
-  ciphertext  String
-  iv          String
+  id                  String            @id @default(cuid(2))
+  senderId            String
+  recipientId         String
+  version             Int               @default(1)
+  ciphertext          String
+  iv                  String
   senderWrappedKey    String
   recipientWrappedKey String
   createdAt           TimestamptzString @default(now())
-  sender      User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient   User     @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender              User              @relation("MessageSender", fields:[senderId], references:[id], onDelete: Cascade)
+  recipient           User              @relation("MessageRecipient", fields:[recipientId], references:[id], onDelete: Cascade)
 
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, senderId, createdAt])
 }
 
+model SecurityEvent {
+  id          String            @id @default(cuid(2))
+  eventType   String
+  occurredAt  TimestamptzString @default(now())
+  actorId     String?
+  source      String
+  severity    String
+  referenceId String?
+  details     String            @default("{}")
+  actor       User?             @relation(fields:[actorId], references:[id], onDelete: SetNull)
+
+  @@index([eventType, occurredAt])
+  @@index([actorId, occurredAt])
+  @@index([referenceId, eventType, occurredAt])
+}
+
 model SecureFile {
-  id                  String   @id @default(cuid(2))
+  id                  String            @id @default(cuid(2))
   senderId            String
   recipientId         String
-  version             Int      @default(1)
+  sessionId           String?
+  requestId           String?
+  version             Int               @default(1)
   ciphertext          Bytes
   ciphertextBytes     Int
   iv                  String
   senderWrappedKey    String
   recipientWrappedKey String
   createdAt           TimestamptzString @default(now())
-  sender              User     @relation("FileSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient           User     @relation("FileRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender              User              @relation("FileSender", fields:[senderId], references:[id], onDelete: Cascade)
+  recipient           User              @relation("FileRecipient", fields:[recipientId], references:[id], onDelete: Cascade)
 
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, senderId, createdAt])
+  @@unique([sessionId, requestId])
 }

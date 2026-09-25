@@ -16,6 +16,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
@@ -44,8 +45,8 @@ export class FilesController {
       limits: {
         fileSize: MAX_CIPHERTEXT_FILE_BYTES,
         files: 1,
-        fields: 4,
-        parts: 5,
+        fields: 5,
+        parts: 6,
         fieldSize: 1024,
       },
     }),
@@ -56,6 +57,7 @@ export class FilesController {
     schema: {
       type: 'object',
       required: [
+        'requestId',
         'recipientUsername',
         'iv',
         'senderWrappedKey',
@@ -63,6 +65,7 @@ export class FilesController {
         'ciphertext',
       ],
       properties: {
+        requestId: { type: 'string', format: 'uuid' },
         recipientUsername: { type: 'string' },
         iv: { type: 'string', minLength: 16, maxLength: 16 },
         senderWrappedKey: { type: 'string', minLength: 342, maxLength: 342 },
@@ -79,6 +82,10 @@ export class FilesController {
     description:
       'Stores AES-GCM ciphertext and RSA-wrapped keys for both participants.',
   })
+  @ApiConflictResponse({
+    description:
+      'The request ID was already accepted in this authenticated session.',
+  })
   @ApiForbiddenResponse({ description: 'Origin or CSRF header was rejected.' })
   async upload(
     @Body() input: UploadFileDto,
@@ -88,7 +95,12 @@ export class FilesController {
     assertBrowserRequest(request);
     if (!file)
       throw new BadRequestException('An encrypted file payload is required');
-    return this.filesService.upload(request.authUser!, input, file);
+    return this.filesService.upload(
+      request.authUser!,
+      request.authSessionId!,
+      input,
+      file,
+    );
   }
 
   @Get('conversation/:username')
@@ -118,5 +130,23 @@ export class FilesController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.filesService.getEncryptedFile(request.authUser!, id);
+  }
+
+  @Post(':id/tamper-report')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Record a client-reported file tamper simulation result',
+  })
+  @ApiCreatedResponse({
+    description:
+      'Stores a sanitized client-reported decryption failure for a participant file.',
+  })
+  @ApiForbiddenResponse({ description: 'Origin or CSRF header was rejected.' })
+  reportTamperSimulation(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    assertBrowserRequest(request);
+    return this.filesService.reportTamperSimulation(request.authUser!, id);
   }
 }

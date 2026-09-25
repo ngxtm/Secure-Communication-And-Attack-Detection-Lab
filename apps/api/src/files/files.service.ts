@@ -41,6 +41,7 @@ function toFileSummary(file: {
 export class FilesService {
   async upload(
     sender: PublicUser,
+    sessionId: string,
     input: UploadFileDto,
     file: EncryptedFileUpload | undefined,
   ) {
@@ -99,15 +100,47 @@ export class FilesService {
       );
     }
 
-    const saved = await db.orm.public.SecureFile.create({
-      senderId: sender.id,
-      recipientId: recipient.id,
-      ciphertext: Uint8Array.from(file.buffer),
-      ciphertextBytes,
-      iv: input.iv,
-      senderWrappedKey: input.senderWrappedKey,
-      recipientWrappedKey: input.recipientWrappedKey,
-    });
+    let saved;
+    try {
+      saved = await db.orm.public.SecureFile.create({
+        senderId: sender.id,
+        recipientId: recipient.id,
+        sessionId,
+        requestId: input.requestId,
+        ciphertext: Uint8Array.from(file.buffer),
+        ciphertextBytes,
+        iv: input.iv,
+        senderWrappedKey: input.senderWrappedKey,
+        recipientWrappedKey: input.recipientWrappedKey,
+      });
+    } catch (error) {
+      const previousUpload = await db.orm.public.SecureFile.where((row) =>
+        row.sessionId.eq(sessionId),
+      )
+        .where((row) => row.requestId.eq(input.requestId))
+        .select('id')
+        .first();
+
+      if (!previousUpload) throw error;
+
+      await db.orm.public.SecurityEvent.create({
+        eventType: 'FILE_REPLAY_BLOCKED',
+        actorId: sender.id,
+        source: 'authenticated-file-upload',
+        severity: 'medium',
+        referenceId: previousUpload.id,
+        details: JSON.stringify({
+          scenario: 'file-upload-replay',
+          requestId: input.requestId,
+          scope: 'authenticated-session',
+        }),
+      });
+
+      throw new ConflictException({
+        code: 'REPLAY_DETECTED',
+        message: 'This file upload request was already accepted.',
+      });
+    }
 
     return { file: toFileSummary(saved) };
   }
@@ -194,6 +227,40 @@ export class FilesService {
         senderWrappedKey: file.senderWrappedKey,
         recipientWrappedKey: file.recipientWrappedKey,
         createdAt: file.createdAt,
+      },
+    };
+  }
+
+  async reportTamperSimulation(user: PublicUser, id: string) {
+    if (!id || id.length > 64) throw new NotFoundException('File not found');
+
+    const file = await db.orm.public.SecureFile.where((row) => row.id.eq(id))
+      .select('id', 'senderId', 'recipientId')
+      .first();
+    if (!file || (file.senderId !== user.id && file.recipientId !== user.id)) {
+      throw new NotFoundException('File not found');
+    }
+
+    const event = await db.orm.public.SecurityEvent.create({
+      eventType: 'FILE_DECRYPTION_FAILED_REPORTED',
+      actorId: user.id,
+      source: 'client-reported',
+      severity: 'medium',
+      referenceId: file.id,
+      details: JSON.stringify({
+        scenario: 'tamper-simulation',
+        verification: 'client-only',
+      }),
+    });
+
+    return {
+      event: {
+        id: event.id,
+        eventType: event.eventType,
+        occurredAt: event.occurredAt,
+        source: event.source,
+        severity: event.severity,
+        referenceId: event.referenceId,
       },
     };
   }

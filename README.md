@@ -72,18 +72,31 @@ Use the **Encrypted file transfer** section on the Messages page after both Alic
 
 - Choose a file up to 8 MiB. The browser encrypts the file bytes and original filename together with AES-256-GCM using a fresh key and 96-bit IV.
 - RSA-OAEP/SHA-256 wraps the AES key separately for the sender and recipient. Both people can decrypt the same file using their local private key.
-- The API receives a multipart upload named `encrypted.bin` with ciphertext, IV, wrapped keys, and recipient username. It stores binary ciphertext in PostgreSQL `bytea`; it does not store the original filename or plaintext file.
+- The API receives a multipart upload named `encrypted.bin` with a UUIDv4 request ID, ciphertext, IV, wrapped keys, and recipient username. It stores binary ciphertext in PostgreSQL `bytea`; it does not store the original filename or plaintext file.
 - The API exposes sender, recipient, upload time, and encrypted payload size so the page can list conversation files. Only those two participants can retrieve the encrypted envelope.
 - Either conversation participant can use **Download & decrypt** to decrypt locally and download as `application/octet-stream`. Files are never previewed or executed by the app.
+- **Simulate tampering** flips one bit in a temporary in-memory copy of the ciphertext. AES-GCM rejects the copy; the original encrypted file remains unchanged.
+- After rejection, the browser reports `FILE_DECRYPTION_FAILED_REPORTED` to the API. The API checks that the signed-in user is a file participant and stores a sanitized event marked `client-reported`; it cannot independently verify the AES-GCM tag.
+- **Attack simulator · Replay upload** resends the most recent successful encrypted envelope using the same UUIDv4 request ID. The API returns HTTP 409 `REPLAY_DETECTED`, stores no duplicate file, and records `FILE_REPLAY_BLOCKED`.
 - Because the API sees only ciphertext, it cannot verify the real MIME type or scan file contents. Use fake course data in this lab.
+
+### Replay the upload with Burp Repeater
+
+1. Route the browser through Burp Proxy (or use Burp's built-in browser), sign in, and send an encrypted file successfully.
+2. In Burp's HTTP history, find the successful `POST /api/files` request and send it to Repeater.
+3. Keep the `Origin`, session cookie, `X-CSRF-Protection: 1`, multipart body, and `requestId` unchanged. Send the request again while the session is active.
+4. Expect HTTP `409` with code `REPLAY_DETECTED`. The database keeps one file row and records `FILE_REPLAY_BLOCKED`.
+
+The request ID is bound to the authenticated server-side session. A new request ID is treated as a new send operation; the ID is a deduplication token, not a digital signature. The in-app simulator uses the same endpoint and sends the latest successful encrypted envelope again.
 
 File endpoints:
 
-- `POST /api/files` — upload an encrypted multipart envelope; requires the session cookie, allowed Origin, and `X-CSRF-Protection: 1`.
+- `POST /api/files` — upload an encrypted multipart envelope with a UUIDv4 `requestId`; requires the session cookie, allowed Origin, and `X-CSRF-Protection: 1`. Reusing a request ID in that session returns HTTP 409 `REPLAY_DETECTED`.
 - `GET /api/files/conversation/{username}` — list up to 50 recent file summaries without ciphertext.
 - `GET /api/files/{id}` — return ciphertext and wrapped keys to a conversation participant.
+- `POST /api/files/{id}/tamper-report` — record a sanitized client-reported tamper simulation result for a participant.
 
-After pulling schema changes, run `pnpm compose:up` when you are ready; Compose applies the checked-in file-transfer migration before starting the app.
+After pulling schema changes, run `pnpm compose:up` when you are ready; Compose applies the checked-in tamper-event and replay-protection migrations before starting the app.
 
 ## Prisma ORM 8
 

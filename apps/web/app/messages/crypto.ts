@@ -516,3 +516,21 @@ export async function decryptFile(
     "The file cannot be decrypted or GCM detected modified data.",
   );
 }
+
+export function tamperFileCiphertextForDemo(
+  file: EncryptedFileEnvelope,
+): EncryptedFileEnvelope {
+  const ciphertext = decodeBase64Url(file.ciphertext);
+  const encryptedDataBytes = ciphertext.byteLength - 16;
+  if (encryptedDataBytes < 1) {
+    throw new Error("The encrypted file is too short to simulate tampering.");
+  }
+
+  const byteToModify = Math.floor(encryptedDataBytes / 2);
+  ciphertext[byteToModify] = ciphertext[byteToModify]! ^ 0x01;
+
+  return {
+    ...file,
+    ciphertext: encodeBase64Url(ciphertext),
+  };
+}

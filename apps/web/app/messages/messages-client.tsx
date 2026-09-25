@@ -10,6 +10,7 @@ import {
   encryptMessage,
   getLocalIdentityKeys,
   saveLocalIdentityKey,
+  tamperFileCiphertextForDemo,
   type EncryptedFileEnvelope,
   type LocalIdentityKey,
   type MessageCiphertext,
@@ -51,6 +52,15 @@ interface FileResponse {
     username: string;
     displayName: string;
   };
+}
+
+interface ReplayableFileUpload {
+  requestId: string;
+  recipientUsername: string;
+  iv: string;
+  senderWrappedKey: string;
+  recipientWrappedKey: string;
+  ciphertext: Uint8Array<ArrayBuffer>;
 }
 
 interface DisplayMessage extends MessageCiphertext {
@@ -103,6 +113,23 @@ function matchingLocalKey(
   );
 }
 
+function createFileUploadFormData(upload: ReplayableFileUpload): FormData {
+  const formData = new FormData();
+  formData.append("requestId", upload.requestId);
+  formData.append("recipientUsername", upload.recipientUsername);
+  formData.append("iv", upload.iv);
+  formData.append("senderWrappedKey", upload.senderWrappedKey);
+  formData.append("recipientWrappedKey", upload.recipientWrappedKey);
+  formData.append(
+    "ciphertext",
+    new Blob([new Uint8Array(upload.ciphertext).buffer], {
+      type: "application/octet-stream",
+    }),
+    "encrypted.bin",
+  );
+  return formData;
+}
+
 export default function MessagesClient() {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [identityState, setIdentityState] = useState<IdentityState>("checking");
@@ -130,6 +157,10 @@ export default function MessagesClient() {
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(
     null,
   );
+  const [tamperingFileId, setTamperingFileId] = useState<string | null>(null);
+  const [replayableUpload, setReplayableUpload] =
+    useState<ReplayableFileUpload | null>(null);
+  const [isReplayingUpload, setIsReplayingUpload] = useState(false);
   const [fileError, setFileError] = useState("");
   const [fileNotice, setFileNotice] = useState("");
 
@@ -494,27 +525,24 @@ export default function MessagesClient() {
         peerIdentity.publicKey,
         ownIdentity.publicKey,
       );
-      const formData = new FormData();
-      formData.append("recipientUsername", peerIdentity.username);
-      formData.append("iv", encrypted.iv);
-      formData.append("senderWrappedKey", encrypted.senderWrappedKey);
-      formData.append("recipientWrappedKey", encrypted.recipientWrappedKey);
-      formData.append(
-        "ciphertext",
-        new Blob([encrypted.ciphertext.buffer], {
-          type: "application/octet-stream",
-        }),
-        "encrypted.bin",
-      );
+      const upload: ReplayableFileUpload = {
+        requestId: crypto.randomUUID(),
+        recipientUsername: peerIdentity.username,
+        iv: encrypted.iv,
+        senderWrappedKey: encrypted.senderWrappedKey,
+        recipientWrappedKey: encrypted.recipientWrappedKey,
+        ciphertext: new Uint8Array(encrypted.ciphertext),
+      };
 
       const response = await fetch("/api/files", {
         method: "POST",
         headers: { "X-CSRF-Protection": "1" },
         credentials: "same-origin",
-        body: formData,
+        body: createFileUploadFormData(upload),
       });
       if (!response.ok) throw new Error(await responseError(response));
 
+      setReplayableUpload(upload);
       setSelectedFile(null);
       form.reset();
       setFileNotice("Encrypted in this browser and uploaded as ciphertext.");
@@ -527,6 +555,56 @@ export default function MessagesClient() {
       );
     } finally {
       setIsUploadingFile(false);
+    }
+  }
+
+  async function simulateFileReplay() {
+    const upload = replayableUpload;
+    if (!user || !upload) return;
+
+    setFileError("");
+    setFileNotice("");
+    setIsReplayingUpload(true);
+    try {
+      const response = await fetch("/api/files", {
+        method: "POST",
+        headers: { "X-CSRF-Protection": "1" },
+        credentials: "same-origin",
+        body: createFileUploadFormData(upload),
+      });
+
+      if (response.status === 409) {
+        const body = (await response.json().catch(() => null)) as {
+          code?: unknown;
+          message?: unknown;
+        } | null;
+        if (body?.code === "REPLAY_DETECTED") {
+          setFileNotice(
+            "Replay blocked with HTTP 409. No second file was stored, and FILE_REPLAY_BLOCKED was logged.",
+          );
+          return;
+        }
+        const message =
+          typeof body?.message === "string"
+            ? body.message
+            : "Replay request was rejected (HTTP 409).";
+        throw new Error(message);
+      }
+
+      if (!response.ok) throw new Error(await responseError(response));
+
+      setFileError(
+        "Replay simulation was not blocked: the server accepted the upload again.",
+      );
+      await refreshFiles();
+    } catch (error) {
+      setFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not run the replay simulation.",
+      );
+    } finally {
+      setIsReplayingUpload(false);
     }
   }
 
@@ -575,6 +653,70 @@ export default function MessagesClient() {
     }
   }
 
+  async function simulateFileTampering(fileId: string) {
+    if (!user) return;
+
+    setFileError("");
+    setFileNotice("");
+    setTamperingFileId(fileId);
+    try {
+      const response = await fetch("/api/files/" + encodeURIComponent(fileId), {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+
+      const data = (await response.json()) as { file: EncryptedFileEnvelope };
+      const tampered = tamperFileCiphertextForDemo(data.file);
+      try {
+        await decryptFile(
+          tampered,
+          user.id,
+          localKeys.map((key) => key.privateKey),
+        );
+        setFileError(
+          "Tamper simulation failed: AES-GCM accepted the modified ciphertext.",
+        );
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !error.message.includes("GCM detected modified data.")
+        ) {
+          throw error;
+        }
+      }
+
+      const reportResponse = await fetch(
+        "/api/files/" + encodeURIComponent(fileId) + "/tamper-report",
+        {
+          method: "POST",
+          headers: { "X-CSRF-Protection": "1" },
+          credentials: "same-origin",
+        },
+      );
+      if (!reportResponse.ok) {
+        setFileError(
+          "AES-GCM rejected the modified ciphertext, but the security event could not be saved: " +
+            (await responseError(reportResponse)),
+        );
+        return;
+      }
+
+      setFileNotice(
+        "Tampering detected by AES-GCM. A client-reported event was logged. The stored file was not changed.",
+      );
+    } catch (error) {
+      setFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not run the tamper simulation.",
+      );
+    } finally {
+      setTamperingFileId(null);
+    }
+  }
+
   async function signOut() {
     setPageError("");
     try {
@@ -590,6 +732,7 @@ export default function MessagesClient() {
       setMessages([]);
       setFiles([]);
       setSelectedFile(null);
+      setReplayableUpload(null);
       setAuthState("signed-out");
       setNotice("Signed out and revoked the session.");
     } catch (error) {
@@ -908,7 +1051,9 @@ export default function MessagesClient() {
                     <button
                       type="button"
                       onClick={() => void refreshFiles()}
-                      disabled={!peerIdentity || isUploadingFile}
+                      disabled={
+                        !peerIdentity || isUploadingFile || isReplayingUpload
+                      }
                       className="min-h-9 rounded-full border border-white/15 px-3 text-xs font-medium text-slate-200 hover:bg-white/[0.07] disabled:cursor-wait disabled:opacity-50"
                     >
                       Refresh files
@@ -956,22 +1101,90 @@ export default function MessagesClient() {
                                 UTC
                               </p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => void downloadFile(file.id)}
-                              disabled={
-                                !activeLocalKey || downloadingFileId !== null
-                              }
-                              className="min-h-9 rounded-full border border-emerald-200/25 px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-200/[0.08] disabled:cursor-wait disabled:opacity-50"
-                            >
-                              {downloadingFileId === file.id
-                                ? "Decrypting…"
-                                : "Download & decrypt"}
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void downloadFile(file.id)}
+                                disabled={
+                                  !activeLocalKey ||
+                                  isUploadingFile ||
+                                  isReplayingUpload ||
+                                  downloadingFileId !== null ||
+                                  tamperingFileId !== null
+                                }
+                                className="min-h-9 rounded-full border border-emerald-200/25 px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-200/[0.08] disabled:cursor-wait disabled:opacity-50"
+                              >
+                                {downloadingFileId === file.id
+                                  ? "Decrypting…"
+                                  : "Download & decrypt"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void simulateFileTampering(file.id)
+                                }
+                                disabled={
+                                  !activeLocalKey ||
+                                  isUploadingFile ||
+                                  isReplayingUpload ||
+                                  downloadingFileId !== null ||
+                                  tamperingFileId !== null
+                                }
+                                className="min-h-9 rounded-full border border-amber-200/25 px-3 text-xs font-semibold text-amber-100 hover:bg-amber-200/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200 disabled:cursor-wait disabled:opacity-50"
+                              >
+                                {tamperingFileId === file.id
+                                  ? "Simulating…"
+                                  : "Simulate tampering"}
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
                     )}
+
+                    <p className="text-xs leading-5 text-slate-400">
+                      The tamper demo changes one bit in a temporary browser
+                      copy. It never alters the stored file.
+                    </p>
+
+                    <div className="rounded-2xl border border-rose-200/15 bg-rose-300/[0.04] p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-rose-100">
+                            Attack simulator · Replay upload
+                          </h3>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">
+                            Re-sends the most recent successful encrypted upload
+                            with its original request ID.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void simulateFileReplay()}
+                          disabled={
+                            !replayableUpload ||
+                            isUploadingFile ||
+                            isReplayingUpload ||
+                            downloadingFileId !== null ||
+                            tamperingFileId !== null
+                          }
+                          className="min-h-9 rounded-full border border-rose-200/25 px-3 text-xs font-semibold text-rose-100 hover:bg-rose-200/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isReplayingUpload
+                            ? "Replaying…"
+                            : "Replay last upload"}
+                        </button>
+                      </div>
+                      {replayableUpload ? (
+                        <p className="mt-3 break-all font-mono text-[11px] text-slate-500">
+                          Same request ID: {replayableUpload.requestId}
+                        </p>
+                      ) : (
+                        <p className="mt-3 text-xs text-slate-500">
+                          Send one file first to create a replayable request.
+                        </p>
+                      )}
+                    </div>
 
                     <form
                       onSubmit={sendFile}
@@ -987,6 +1200,7 @@ export default function MessagesClient() {
                         <input
                           id="encrypted-file"
                           type="file"
+                          disabled={isUploadingFile || isReplayingUpload}
                           onChange={(event) =>
                             setSelectedFile(
                               event.currentTarget.files?.[0] ?? null,
@@ -1002,7 +1216,12 @@ export default function MessagesClient() {
                       </div>
                       <button
                         type="submit"
-                        disabled={!canSend || isUploadingFile || !selectedFile}
+                        disabled={
+                          !canSend ||
+                          isUploadingFile ||
+                          isReplayingUpload ||
+                          !selectedFile
+                        }
                         className="min-h-11 rounded-full bg-emerald-200 px-5 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {isUploadingFile

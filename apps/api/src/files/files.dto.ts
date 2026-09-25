@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsString,
+  IsUUID,
   Length,
   Matches,
   MaxLength,
@@ -11,6 +12,10 @@ const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const USERNAME = /^[A-Za-z0-9._-]+$/;
 
 export class UploadFileDto {
+  @IsString()
+  @IsUUID('4')
+  requestId!: string;
+
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )

@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'d5b9ce705b48eff7ed2ccf8b0f1001f91f51654a4dfc152593fb0d6f62930703'>;
+  StorageHashBase<'2c17f02d9c1a92925cf57d66c1c1da4e14310d28bff4ad4c9b0611d15e9f9996'>;
 export type ExecutionHash =
   ExecutionHashBase<'f5e7900f3b503094628ea4e9e942a2b165f5b860d085cebaf338e01c33946882'>;
 export type ProfileHash =
@@ -268,8 +268,6 @@ export type FieldOutputTypes = {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly senderId: CodecTypes['pg/text@1']['output'];
       readonly recipientId: CodecTypes['pg/text@1']['output'];
-      readonly sessionId: CodecTypes['pg/text@1']['output'] | null;
-      readonly requestId: CodecTypes['pg/text@1']['output'] | null;
       readonly version: CodecTypes['pg/int4@1']['output'];
       readonly ciphertext: CodecTypes['pg/bytea@1']['output'];
       readonly ciphertextBytes: CodecTypes['pg/int4@1']['output'];
@@ -338,8 +336,6 @@ export type FieldInputTypes = {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly senderId: CodecTypes['pg/text@1']['input'];
       readonly recipientId: CodecTypes['pg/text@1']['input'];
-      readonly sessionId: CodecTypes['pg/text@1']['input'] | null;
-      readonly requestId: CodecTypes['pg/text@1']['input'] | null;
       readonly version: CodecTypes['pg/int4@1']['input'];
       readonly ciphertext: CodecTypes['pg/bytea@1']['input'];
       readonly ciphertextBytes: CodecTypes['pg/int4@1']['input'];
@@ -412,10 +408,8 @@ export type StorageColumnTypes = {
       readonly iv: CodecTypes['pg/text@1']['output'];
       readonly recipientId: CodecTypes['pg/text@1']['output'];
       readonly recipientWrappedKey: CodecTypes['pg/text@1']['output'];
-      readonly requestId: CodecTypes['pg/text@1']['output'] | null;
       readonly senderId: CodecTypes['pg/text@1']['output'];
       readonly senderWrappedKey: CodecTypes['pg/text@1']['output'];
-      readonly sessionId: CodecTypes['pg/text@1']['output'] | null;
       readonly version: CodecTypes['pg/int4@1']['output'];
     };
     readonly secureMessage: {
@@ -482,10 +476,8 @@ export type StorageColumnInputTypes = {
       readonly iv: CodecTypes['pg/text@1']['input'];
       readonly recipientId: CodecTypes['pg/text@1']['input'];
       readonly recipientWrappedKey: CodecTypes['pg/text@1']['input'];
-      readonly requestId: CodecTypes['pg/text@1']['input'] | null;
       readonly senderId: CodecTypes['pg/text@1']['input'];
       readonly senderWrappedKey: CodecTypes['pg/text@1']['input'];
-      readonly sessionId: CodecTypes['pg/text@1']['input'] | null;
       readonly version: CodecTypes['pg/int4@1']['input'];
     };
     readonly secureMessage: {
@@ -590,8 +582,6 @@ export namespace Models {
     id: CodecTypes['pg/text@1']['output'];
     senderId: CodecTypes['pg/text@1']['output'];
     recipientId: CodecTypes['pg/text@1']['output'];
-    sessionId: CodecTypes['pg/text@1']['output'] | null;
-    requestId: CodecTypes['pg/text@1']['output'] | null;
     version: CodecTypes['pg/int4@1']['output'];
     ciphertext: CodecTypes['pg/bytea@1']['output'];
     ciphertextBytes: CodecTypes['pg/int4@1']['output'];
@@ -830,16 +820,6 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
                 };
-                readonly sessionId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly requestId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
                 readonly version: {
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
@@ -882,7 +862,7 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [{ readonly columns: readonly ['sessionId', 'requestId'] }];
+              uniques: readonly [];
               indexes: readonly [
                 {
                   readonly name: 'secureFile_senderId_recipientId_createdAt_idx_6cf1f7d2';
@@ -1396,14 +1376,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly sessionId: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly requestId: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
               readonly version: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -1463,8 +1435,6 @@ type ContractBase = Omit<
                 readonly id: { readonly column: 'id' };
                 readonly senderId: { readonly column: 'senderId' };
                 readonly recipientId: { readonly column: 'recipientId' };
-                readonly sessionId: { readonly column: 'sessionId' };
-                readonly requestId: { readonly column: 'requestId' };
                 readonly version: { readonly column: 'version' };
                 readonly ciphertext: { readonly column: 'ciphertext' };
                 readonly ciphertextBytes: { readonly column: 'ciphertextBytes' };

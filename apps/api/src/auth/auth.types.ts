@@ -9,6 +9,7 @@ export interface PublicUser {
 
 export interface AuthenticatedRequest extends Request {
   authUser?: PublicUser;
+  authSessionId?: string;
 }
 
 export function toPublicUser(user: {
