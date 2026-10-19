@@ -9,6 +9,8 @@
     "node": ">=24.15.0"
   },
   "scripts": {
+    "check": "pnpm -r typecheck && pnpm -r lint && pnpm -r test",
+    "test:e2e": "pnpm --filter web test:e2e",
     "compose:up": "docker compose up --build",
     "compose:down": "docker compose down"
   }

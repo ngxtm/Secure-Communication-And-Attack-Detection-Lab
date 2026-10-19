@@ -98,6 +98,24 @@ File endpoints:
 
 After pulling schema changes, run `pnpm compose:up` when you are ready; Compose applies the checked-in tamper-event and replay-protection migrations before starting the app.
 
+## Checks before a presentation
+
+Run `pnpm check` from the repository root. This checks TypeScript, lint, and the API/web unit tests. The Web Crypto tests use the real implementation to verify message/file round trips, non-extractable private keys, key rotation, and rejection of modified ciphertext. API tests cover login cooldowns, session-token hashing, and Origin/CSRF checks.
+
+The API is an application rather than a published TypeScript library, so its compiler does not emit declaration files. Type checking still covers the Prisma configuration and migrations.
+
+For the live HTTP integration tests, use a **fresh isolated Compose project**. They publish test encryption identities and send fake messages/files. They refuse to replace an existing identity. Stop other instances using the same local ports first. The root `.env` must already contain valid lab credentials; tests load them without printing them.
+
+```powershell
+docker compose -p network-security-lab-check up -d --build --wait --wait-timeout 180
+$env:LAB_E2E = '1'
+pnpm test:e2e
+Remove-Item Env:LAB_E2E
+docker compose -p network-security-lab-check down -v
+```
+
+The `-v` cleanup above applies only to the disposable `network-security-lab-check` project. Keep the normal lab's database volume. Each integration run needs a fresh test volume. These tests exercise login, the Next.js API proxy, public-key registration, message/file decryption by both participants, concurrent replay protection, tamper reporting, logout revocation, CSRF rejection, and brute-force blocking. They do not automate browser interaction; rehearse fingerprint confirmation, file selection, and download in the browser separately.
+
 ## Prisma ORM 8
 
 The project uses Prisma ORM 8's PostgreSQL contract and runtime. After editing `apps/api/src/prisma/contract.prisma`, emit types and plan a reviewed migration:

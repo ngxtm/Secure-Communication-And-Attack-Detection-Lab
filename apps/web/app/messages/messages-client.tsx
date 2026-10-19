@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   createLocalIdentityKey,
   decryptFile,
@@ -163,6 +169,8 @@ export default function MessagesClient() {
   const [isReplayingUpload, setIsReplayingUpload] = useState(false);
   const [fileError, setFileError] = useState("");
   const [fileNotice, setFileNotice] = useState("");
+  const messageRequest = useRef<AbortController | null>(null);
+  const fileRequest = useRef<AbortController | null>(null);
 
   const peerUsername =
     user?.username.toLowerCase() === "alice" ? "bob" : "alice";
@@ -260,8 +268,7 @@ export default function MessagesClient() {
     if (!user) return;
 
     let cancelled = false;
-    setPeerState("checking");
-    setPeerIdentity(null);
+    const controller = new AbortController();
 
     async function loadPeerIdentity() {
       try {
@@ -270,6 +277,7 @@ export default function MessagesClient() {
           {
             cache: "no-store",
             credentials: "same-origin",
+            signal: controller.signal,
           },
         );
         if (!response.ok) throw new Error(await responseError(response));
@@ -313,20 +321,20 @@ export default function MessagesClient() {
     void loadPeerIdentity();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [peerUsername, user]);
 
-  const refreshMessages = useCallback(async () => {
-    if (!user || !peerIdentity) return;
+  const loadMessages = useCallback(
+    async (controller: AbortController) => {
+      if (!user || !peerIdentity) return;
 
-    setIsLoadingMessages(true);
-    setConversationError("");
-    try {
       const response = await fetch(
         `/api/messages/conversation/${encodeURIComponent(peerIdentity.username)}`,
         {
           cache: "no-store",
           credentials: "same-origin",
+          signal: controller.signal,
         },
       );
       if (!response.ok) throw new Error(await responseError(response));
@@ -346,49 +354,114 @@ export default function MessagesClient() {
           }
         }),
       );
-      setMessages(decrypted);
+      return decrypted;
+    },
+    [localKeys, peerIdentity, user],
+  );
+
+  const refreshMessages = useCallback(async () => {
+    messageRequest.current?.abort();
+    const controller = new AbortController();
+    messageRequest.current = controller;
+    setIsLoadingMessages(true);
+    setConversationError("");
+    try {
+      const decrypted = await loadMessages(controller);
+      if (!controller.signal.aborted && decrypted) setMessages(decrypted);
     } catch (error) {
-      setConversationError(
-        error instanceof Error
-          ? error.message
-          : "Could not load the conversation.",
-      );
+      if (!controller.signal.aborted) {
+        setConversationError(
+          error instanceof Error
+            ? error.message
+            : "Could not load the conversation.",
+        );
+      }
     } finally {
-      setIsLoadingMessages(false);
+      if (!controller.signal.aborted) setIsLoadingMessages(false);
     }
-  }, [localKeys, peerIdentity, user]);
+  }, [loadMessages]);
 
   useEffect(() => {
-    void refreshMessages();
-  }, [refreshMessages]);
+    messageRequest.current?.abort();
+    const controller = new AbortController();
+    messageRequest.current = controller;
+    void loadMessages(controller)
+      .then((decrypted) => {
+        if (controller.signal.aborted || !decrypted) return;
+        setMessages(decrypted);
+        setConversationError("");
+        setIsLoadingMessages(false);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setConversationError(
+          error instanceof Error
+            ? error.message
+            : "Could not load the conversation.",
+        );
+        setIsLoadingMessages(false);
+      });
+    return () => messageRequest.current?.abort();
+  }, [loadMessages]);
 
-  const refreshFiles = useCallback(async () => {
-    if (!user || !peerIdentity) return;
+  const loadFiles = useCallback(
+    async (controller: AbortController) => {
+      if (!user || !peerIdentity) return;
 
-    setFileError("");
-    try {
       const response = await fetch(
         "/api/files/conversation/" + encodeURIComponent(peerIdentity.username),
         {
           cache: "no-store",
           credentials: "same-origin",
+          signal: controller.signal,
         },
       );
       if (!response.ok) throw new Error(await responseError(response));
       const data = (await response.json()) as FileResponse;
-      setFiles(data.files);
+      return data.files;
+    },
+    [peerIdentity, user],
+  );
+
+  const refreshFiles = useCallback(async () => {
+    fileRequest.current?.abort();
+    const controller = new AbortController();
+    fileRequest.current = controller;
+    setFileError("");
+    try {
+      const summaries = await loadFiles(controller);
+      if (!controller.signal.aborted && summaries) setFiles(summaries);
     } catch (error) {
-      setFileError(
-        error instanceof Error
-          ? error.message
-          : "Could not load encrypted files.",
-      );
+      if (!controller.signal.aborted) {
+        setFileError(
+          error instanceof Error
+            ? error.message
+            : "Could not load encrypted files.",
+        );
+      }
     }
-  }, [peerIdentity, user]);
+  }, [loadFiles]);
 
   useEffect(() => {
-    void refreshFiles();
-  }, [refreshFiles]);
+    fileRequest.current?.abort();
+    const controller = new AbortController();
+    fileRequest.current = controller;
+    void loadFiles(controller)
+      .then((summaries) => {
+        if (controller.signal.aborted || !summaries) return;
+        setFiles(summaries);
+        setFileError("");
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setFileError(
+          error instanceof Error
+            ? error.message
+            : "Could not load encrypted files.",
+        );
+      });
+    return () => fileRequest.current?.abort();
+  }, [loadFiles]);
 
   async function confirmPeerFingerprint() {
     if (!peerIdentity) return;
@@ -1283,7 +1356,9 @@ export default function MessagesClient() {
 
                 <div className="mt-4 space-y-2 text-xs leading-5 text-slate-400">
                   <p>RSA-OAEP / SHA-256 · non-extractable private key</p>
-                  <p>The private key is stored in this browser's IndexedDB.</p>
+                  <p>
+                    The private key is stored in this browser&apos;s IndexedDB.
+                  </p>
                   <p>AES-256-GCM uses a new random key for each message.</p>
                 </div>
 
@@ -1338,7 +1413,7 @@ export default function MessagesClient() {
                     </code>
                     <p className="mt-3 text-xs leading-5 text-slate-400">
                       Compare this value with the fingerprint shown in{" "}
-                      {peerUsername}'s account, using another channel. The
+                      {peerUsername}&apos;s account, using another channel. The
                       server distributes the public key but does not
                       authenticate its owner.
                     </p>

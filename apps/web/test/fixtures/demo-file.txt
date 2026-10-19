@@ -1,0 +1,3 @@
+Network Security Lab - presentation rehearsal
+Alice sends this sample to Bob using browser-side encryption.
+Expected result: both participants recover these exact bytes.
